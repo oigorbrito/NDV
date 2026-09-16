@@ -59,8 +59,9 @@
       "focal_verifier_ref", "focal_verifier_sha256",
       "preservation_ref", "preservation_sha256",
       "verifier_provenance_ref", "verifier_provenance_sha256",
-      "environment_ref"
+      "environment_ref", "environment_sha256"
     ],
+    "artifact_integrity_rule": "Freeze must re-read and re-hash every referenced artifact; well-formed declared hashes alone are insufficient.",
     "required_oracle_classification": "EXPECTED_BASE_BEHAVIOR"
   },
   "direct_call_rule": "validator, decision tool, and freeze tool each fail closed independently; safety does not depend on invocation order",
