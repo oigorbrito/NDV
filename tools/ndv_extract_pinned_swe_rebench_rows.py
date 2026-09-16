@@ -36,30 +36,32 @@ def dump_jsonl(path: Path, records: list[dict[str, Any]]) -> None:
             fh.write(json.dumps(record, sort_keys=True, ensure_ascii=False) + "\n")
 
 
+def validate_indices(indices: list[int]) -> None:
+    if not indices:
+        raise SystemExit("no row indices requested")
+    if not all(isinstance(idx, int) and idx >= 0 for idx in indices):
+        raise SystemExit("source_row_index values must be non-negative integers")
+    if len(indices) != len(set(indices)):
+        raise SystemExit("duplicate source_row_index values are forbidden")
+
+
 def extract_rows(parquet_path: Path, indices: list[int]) -> list[tuple[int, dict[str, Any]]]:
+    validate_indices(indices)
     try:
         import pyarrow.parquet as pq
     except ImportError as exc:
         raise SystemExit("pyarrow is required for pinned parquet extraction") from exc
 
     table = pq.read_table(parquet_path)
-    if not indices:
-        raise SystemExit("no row indices requested")
-    if len(indices) != len(set(indices)):
-        raise SystemExit("duplicate source_row_index values are forbidden")
     row_count = table.num_rows
-    bad = [idx for idx in indices if idx < 0 or idx >= row_count]
+    bad = [idx for idx in indices if idx >= row_count]
     if bad:
         raise SystemExit(f"row indices out of range for {row_count} rows: {bad}")
     return [(idx, table.slice(idx, 1).to_pylist()[0]) for idx in indices]
 
 
 def make_record(source_row_index: int, row: dict[str, Any]) -> dict[str, Any]:
-    return {
-        "schema_id": "ndv-p1-s2-extracted-row-envelope-v1",
-        "source_row_index": source_row_index,
-        "full_row": row,
-    }
+    return {"schema_id": "ndv-p1-s2-extracted-row-envelope-v1", "source_row_index": source_row_index, "full_row": row}
 
 
 def main() -> int:
@@ -79,15 +81,14 @@ def main() -> int:
     if actual_sha != expected_sha:
         print(json.dumps({"status": "FAIL", "reason": "PARQUET_SHA256_MISMATCH", "expected": expected_sha, "actual": actual_sha}, indent=2))
         return 2
-
     if wave.get("source", {}).get("dataset_revision") != snapshot.get("pinned_revision"):
         print(json.dumps({"status": "FAIL", "reason": "REVISION_MISMATCH_BETWEEN_WAVE_AND_SNAPSHOT"}, indent=2))
         return 2
 
     candidates = wave.get("candidates", [])
     indices = [candidate["source_row_index"] for candidate in candidates]
+    validate_indices(indices)
     extracted = extract_rows(args.parquet, indices)
-
     records: list[dict[str, Any]] = []
     for candidate, (source_index, row) in zip(candidates, extracted):
         if source_index != candidate.get("source_row_index"):
@@ -101,28 +102,14 @@ def main() -> int:
         records.append(make_record(source_index, row))
 
     dump_jsonl(args.out, records)
-    result: dict[str, Any] = {
-        "status": "PASS",
-        "schema_id": "ndv-p1-s2-pinned-row-extraction-v2",
-        "parquet_sha256": actual_sha,
-        "pinned_revision": snapshot.get("pinned_revision"),
-        "rows_extracted": len(records),
-        "row_indices": indices,
-        "jsonl": str(args.out),
-        "raw_rows_mutated": False,
-    }
-
+    result: dict[str, Any] = {"status": "PASS", "schema_id": "ndv-p1-s2-pinned-row-extraction-v2", "parquet_sha256": actual_sha, "pinned_revision": snapshot.get("pinned_revision"), "rows_extracted": len(records), "row_indices": indices, "jsonl": str(args.out), "raw_rows_mutated": False}
     if args.quarantine_out:
         proc = subprocess.run([sys.executable, str(args.quarantine_tool), "--rows", str(args.out), "--wave", str(args.wave), "--out", str(args.quarantine_out)], text=True, capture_output=True, check=False)
-        result["quarantine_exit_code"] = proc.returncode
-        result["quarantine_stdout"] = proc.stdout.strip()
-        result["quarantine_stderr"] = proc.stderr.strip()
+        result["quarantine_exit_code"], result["quarantine_stdout"], result["quarantine_stderr"] = proc.returncode, proc.stdout.strip(), proc.stderr.strip()
         if proc.returncode != 0:
-            result["status"] = "FAIL"
-            result["reason"] = "QUARANTINE_FAILED"
+            result["status"], result["reason"] = "FAIL", "QUARANTINE_FAILED"
             print(json.dumps(result, indent=2, sort_keys=True))
             return 2
-
     print(json.dumps(result, indent=2, sort_keys=True))
     return 0
 
