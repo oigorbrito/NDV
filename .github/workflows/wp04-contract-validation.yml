@@ -1,0 +1,40 @@
+name: WP-04 Contract Validation
+
+on:
+  push:
+    paths:
+      - 'experiments/p1/wp04-real-executor-smoke-v1.json'
+      - 'experiments/p1/wp04-executor-binding-v1.template.json'
+      - 'tools/ndv_validate_wp04_smoke.py'
+      - 'tools/test_ndv_validate_wp04_smoke.py'
+      - '.github/workflows/wp04-contract-validation.yml'
+  pull_request:
+    paths:
+      - 'experiments/p1/wp04-real-executor-smoke-v1.json'
+      - 'experiments/p1/wp04-executor-binding-v1.template.json'
+      - 'tools/ndv_validate_wp04_smoke.py'
+      - 'tools/test_ndv_validate_wp04_smoke.py'
+      - '.github/workflows/wp04-contract-validation.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout NDV
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Validate frozen campaign
+        run: python tools/ndv_validate_wp04_smoke.py
+
+      - name: Run WP-04 validator tests
+        working-directory: tools
+        run: python -m unittest -v test_ndv_validate_wp04_smoke.py
