@@ -15,8 +15,17 @@
     "verifier_details_in_prompt": false
   },
   "verifier": {
-    "focal": ["python", "-m", "unittest", "tests.unit.test_operator_ux_doctor"],
-    "preservation": ["python", "-m", "unittest", "discover", "-s", "tests/unit"]
+    "historical_focal_status": "NON_DISCRIMINATING_ON_BASE_10_OF_10_PASS",
+    "historical_preservation_status": "BASE_469_OF_469_PASS_AFTER_FROZEN_ENV_SETUP",
+    "focal": {
+      "type": "EXTERNAL_REQUIREMENT_STRUCTURAL",
+      "ref": "tools/ndv_verify_df501_structural.py",
+      "required_base_result": "FAIL",
+      "required_candidate_result": "PASS"
+    },
+    "preservation": ["python", "-B", "-m", "unittest", "discover", "-s", "tests/unit"],
+    "environment_setup": "python -m venv --system-site-packages <venv>; <venv-python> -m pip install --no-index --no-deps --no-build-isolation --editable <base>",
+    "required_base_preservation_result": "PASS"
   },
   "execution_policy": {
     "retry_limit": 0,
