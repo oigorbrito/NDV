@@ -6,6 +6,7 @@ on:
       - 'experiments/p1/s2-corpus-intake-v1.json'
       - 'experiments/p1/s2-source-snapshot-01.json'
       - 'experiments/p1/s2-parquet-acquisition-v1.json'
+      - 'experiments/p1/s2-extraction-environment-v1.json'
       - 'experiments/p1/s2-candidate-wave-01.json'
       - 'experiments/p1/s2-audit-state-01.json'
       - 'experiments/p1/s2-verifier-environment-audit-v2.json'
@@ -38,6 +39,7 @@ on:
       - 'experiments/p1/s2-corpus-intake-v1.json'
       - 'experiments/p1/s2-source-snapshot-01.json'
       - 'experiments/p1/s2-parquet-acquisition-v1.json'
+      - 'experiments/p1/s2-extraction-environment-v1.json'
       - 'experiments/p1/s2-candidate-wave-01.json'
       - 'experiments/p1/s2-audit-state-01.json'
       - 'experiments/p1/s2-verifier-environment-audit-v2.json'
@@ -95,6 +97,15 @@ jobs:
         run: |
           python tools/ndv_validate_corpus_intake.py experiments/p1/s2-candidate-wave-01.json
           python tools/ndv_validate_s2_audit.py experiments/p1/s2-audit-state-01.json
+          python - <<'PY'
+          import json, sys
+          p=json.load(open('experiments/p1/s2-extraction-environment-v1.json'))
+          assert p['schema_id']=='ndv-p1-s2-extraction-environment-v1'
+          assert (p['python']['required_major'],p['python']['required_minor'])==sys.version_info[:2]
+          assert p['pyarrow']['required_version']=='25.0.1'
+          assert p['network_during_extraction']=='FORBIDDEN'
+          assert p['treatment_execution']=='NOT_EXECUTED' and p['holdout_access']=='NONE'
+          PY
       - name: Run S2 admission unit tests
         working-directory: tools
         run: |
