@@ -63,19 +63,34 @@ Because the already-preserved Stage-1 bundle predates v2, `tools/ndv_upgrade_wp0
 
 Stage 2 and closure prefer this v2 sidecar when present.
 
+### Original binding preservation
+
+The preserved Stage-1 report records the local original binding path `.ndv-probes\bindings\wp04-aider-qwen25-coder-3b-v2.json`, but the exact binding bytes are not yet present in the repository. The binding must **not** be reconstructed after the fact from the report.
+
+`tools/ndv_import_wp04_binding.py` is the preservation gate. Given the original local binding-v2 file, it:
+
+1. validates the full current binding-v2 contract;
+2. requires exact Stage-1 `binding_id` and executor-identity match;
+3. rejects retry/escalation, fallback, dynamic routing, or download drift;
+4. copies the exact original bytes into a stable evidence directory;
+5. records binding SHA-256/size and Stage-1 report SHA-256 in `binding-import-receipt.json`;
+6. explicitly records `binding_reconstructed=false` and `treatment_reexecuted=false`.
+
+GitHub issue #2 tracks this provenance blocker. The importer/tests are CI-green in WP-04 run `35148684510`; the remaining blocker is availability of the original local binding file.
+
 ### Stage 2 — D-F6-01
 
 Stage 2 has **not** been executed. Its task contract and runner are frozen. Before any D-F6-01 exposure, `tools/ndv_run_wp04_stage2_df601.py` now requires:
 
 1. a hash-valid Stage-1 import manifest v2;
-2. the same binding ID used in Stage 1;
-3. the exact Aider executable path frozen in the binding;
+2. the same original binding used in Stage 1;
+3. the exact Aider executable path frozen in that binding;
 4. `aider --version` to exactly match the frozen Aider version;
 5. discriminating structural focal failure on the untouched historical base;
 6. all frozen Rust baseline oracle checks to pass;
 7. zero retry/escalation and sealed holdout.
 
-The Stage-1 artifact inventory shape is now aligned with the canonical v2 importer format: a list of `{path, size_bytes, sha256}` records. This fixes the prior inconsistency where the Stage-2 runner expected a dict/`bytes` shape that the official importer never emitted.
+The Stage-1 artifact inventory shape is aligned with the canonical v2 importer format: a list of `{path, size_bytes, sha256}` records. This fixes the prior inconsistency where the Stage-2 runner expected a dict/`bytes` shape that the official importer never emitted.
 
 ## Import and campaign closure
 
@@ -100,16 +115,18 @@ A valid failure is useful if candidate capture, verifier evidence, accounting, a
 ```text
 WP-03 = PASS
 WP-04_CONTRACT = FROZEN
-WP-04_EXECUTOR_BINDING_V2 = FROZEN / QUALIFIED
+WP-04_EXECUTOR_BINDING_V2 = FROZEN / QUALIFIED AT STAGE1 EXECUTION
+WP-04_ORIGINAL_BINDING_BYTES_IN_REPO = NO
+WP-04_BINDING_IMPORT_TOOLING = PASS (CI 35148684510)
 WP-04_STAGE1_D-F5-01 = EXECUTED
 WP-04_STAGE1_OUTCOME = SMOKE_VALID_FAILED
 WP-04_STAGE1_RAW_EVIDENCE = PRESERVED
 WP-04_STAGE1_IMPORT_V1 = HISTORICAL
 WP-04_STAGE1_IMPORT_V2_SIDECAR = TOOLING_READY / NOT_YET_PERSISTED
-WP-04_STAGE2_D-F6-01 = NOT_EXECUTED
+WP-04_STAGE2_D-F6-01 = BLOCKED_ON_ORIGINAL_BINDING_PRESERVATION
 WP-04_CAMPAIGN_CLOSURE = NOT_COMPLETE
 COMPARATIVE_AUTHORITY = NONE
 ARCHITECTURE_AUTHORITY = NONE
 ```
 
-The next execution gate is: create/revalidate the Stage-1 v2 sidecar, then run D-F6-01 once with the exact frozen binding. No Stage-2 exposure is authorized if the sidecar/hash/binding/scaffold gates fail.
+The next execution gate is: import the **original** binding-v2 bytes, create/revalidate the Stage-1 v2 sidecar, and only then run D-F6-01 once with that exact binding. No Stage-2 exposure is authorized if the binding/sidecar/hash/scaffold gates fail.
