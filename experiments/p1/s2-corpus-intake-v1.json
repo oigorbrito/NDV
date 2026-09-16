@@ -1,0 +1,103 @@
+{
+  "schema_id": "ndv-p1-s2-corpus-intake-v1",
+  "purpose": "Prospective verifier-first intake for comparative corpus expansion without treatment execution.",
+  "historical_contract": {
+    "repository": "oigorbrito/dv",
+    "commit": "66f3a218fba800daed5d86fdfce386491b8ab0e8",
+    "path": "experiments/p1/task-admissibility-contract-v1.json"
+  },
+  "historical_admitted_tasks": ["D-F5-01", "D-F6-01"],
+  "target": {
+    "initial_admitted_tasks": 9,
+    "minimum_families": 3,
+    "minimum_repositories": 3,
+    "minimum_languages": 2,
+    "note": "Operational target, not a universal statistical power claim."
+  },
+  "source_priority": [
+    {
+      "source_id": "SRC-SWE-REBENCH-V2",
+      "role": "PRIMARY_DEVELOPMENT_ACQUISITION",
+      "status": "SCREEN_SOURCE_NOT_INSTANCES"
+    },
+    {
+      "source_id": "SRC-OMNICODE",
+      "role": "SECONDARY_TASK-TYPE_DIVERSITY",
+      "status": "SCREEN_SOURCE_NOT_INSTANCES"
+    },
+    {
+      "source_id": "SRC-SWEBENCH-PRO-VERIFIED",
+      "role": "LATER_CONFIRMATION_CANDIDATE",
+      "status": "PRESERVE_WHERE_POSSIBLE"
+    },
+    {
+      "source_id": "SRC-TERMINAL-BENCH-2",
+      "role": "LATER_HETEROGENEITY_GENERALIZATION",
+      "status": "NOT_PRIMARY_P1_S2_SOURCE"
+    }
+  ],
+  "screening_order": [
+    "discover candidate",
+    "freeze source metadata",
+    "identify exact pre-solution base",
+    "freeze task statement",
+    "identify focal verifier",
+    "prove verifier provenance and independence",
+    "materialize reproducible environment",
+    "execute base verifier",
+    "execute preservation baseline",
+    "classify environment",
+    "check solution isolation",
+    "assign exactly one family",
+    "admit and freeze or reject explicitly"
+  ],
+  "candidate_required_fields": [
+    "candidate_id",
+    "source_id",
+    "repository",
+    "base_revision",
+    "task_statement_ref",
+    "task_statement_sha256",
+    "language",
+    "proposed_family",
+    "focal_verifier_ref",
+    "verifier_provenance",
+    "verifier_independent",
+    "preservation_ref",
+    "environment_ref",
+    "base_behavior",
+    "solution_isolation",
+    "disposition",
+    "disposition_reason"
+  ],
+  "allowed_dispositions": [
+    "DISCOVERED",
+    "SCREENING",
+    "ADMITTED",
+    "REJECTED_INVALID_ORACLE",
+    "REJECTED_VERIFIER_ARTIFACT_UNAVAILABLE",
+    "REJECTED_ENVIRONMENT_NOT_REPRODUCIBLE",
+    "REJECTED_BASE_UNUSABLE",
+    "REJECTED_SOLUTION_LEAKAGE_REQUIRED",
+    "REJECTED_OTHER_EXPLICIT_REASON"
+  ],
+  "selection_prohibitions": [
+    "Do not select or reject a candidate based on treatment/model performance.",
+    "Do not expose admitted candidates to executors before admission is frozen.",
+    "Do not repair an invalid oracle using knowledge from a gold solution if that introduces leakage.",
+    "Do not silently replace or relabel rejected candidates.",
+    "Do not access sealed holdout material during development acquisition."
+  ],
+  "task_profile_fields": [
+    "spread",
+    "novelty",
+    "centrality",
+    "tool_intensity",
+    "sequential_depth",
+    "parallelizability",
+    "specification_ambiguity",
+    "verification_strength",
+    "context_footprint"
+  ],
+  "treatment_execution": "FORBIDDEN_DURING_DISCOVERY"
+}
