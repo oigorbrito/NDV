@@ -20,20 +20,27 @@ Source identity is frozen by `experiments/p1/s2-source-snapshot-01.json`: `nebiu
 
 ## Pinned acquisition
 
-`experiments/p1/s2-parquet-acquisition-v1.json` and `tools/ndv_acquire_s2_pinned_parquet.py` define the explicit acquisition path. The operator-invoked command downloads only the exact dataset/revision/path into a `.part` file, fsyncs it, verifies frozen byte size and SHA-256, and only then atomically finalizes the destination. Existing mismatched files are never overwritten implicitly. The receipt records network use, source identity, expected/observed integrity, `treatment_execution=NOT_EXECUTED`, and `holdout_access=NONE`.
+`experiments/p1/s2-parquet-acquisition-v1.json` and `tools/ndv_acquire_s2_pinned_parquet.py` define the explicit operator-invoked acquisition path. The tool binds source snapshot and acquisition contract by file SHA-256, downloads only the exact dataset/revision/path into a `.part` file, fsyncs it, verifies frozen byte size and SHA-256, and only then atomically finalizes the destination. Existing mismatched files are never overwritten implicitly.
 
-Acquisition is not performed by CI and has not yet been observed for Wave 01.
+The acquisition receipt is `ndv-p1-s2-parquet-acquisition-receipt-v2`; it records hashes of the snapshot/contract bytes, exact expected/observed Parquet identity, network use, `treatment_execution=NOT_EXECUTED`, and `holdout_access=NONE`.
+
+Acquisition is not performed by CI and has not yet been observed locally for Wave 01.
+
+## Byte-bound materialization gate
+
+`tools/ndv_materialize_s2_wave.py` is the only recommended post-acquisition entry point. It performs **no network access, Docker execution, model call, treatment, or holdout access**. Before extraction it revalidates:
+
+- acquisition receipt schema/status;
+- receipt → exact snapshot/contract file hashes;
+- receipt/source `source_id`, dataset, pinned revision, and Parquet path;
+- local Parquet size and SHA-256 against the frozen snapshot;
+- receipt expected/observed byte identity against the local Parquet.
+
+Only after those checks pass does it invoke the pinned extractor with quarantine. It then requires a complete `ndv-p1-s2-quarantine-aggregate-v2` where every Wave-01 candidate passed quarantine and writes `ndv-p1-s2-wave-materialization-receipt-v1`, binding the Parquet, acquisition receipt, wave file, extracted JSONL, and quarantine aggregate by SHA-256.
+
+This separates network acquisition from corpus materialization while maintaining one cryptographic evidence chain.
 
 ## Pinned extraction and row identity
-
-```bash
-python tools/ndv_extract_pinned_swe_rebench_rows.py \
-  --parquet path/to/train-00000-of-00001.parquet \
-  --wave experiments/p1/s2-candidate-wave-01.json \
-  --snapshot experiments/p1/s2-source-snapshot-01.json \
-  --out .ndv-corpus/s2-w01/pinned-rows.jsonl \
-  --quarantine-out .ndv-corpus/s2-w01/quarantine
-```
 
 The extractor verifies Parquet SHA-256 and frozen revision, rejects duplicate/invalid `source_row_index`, binds each selected row to `instance_id` and `base_commit`, and writes `ndv-p1-s2-extracted-row-envelope-v1`. Each envelope stores the **original Parquet row index separately from the untouched upstream row**. This prevents compact selected exports (`0..N`) from being confused with original indices `0,2,3,12,15,23`. The raw row is not modified before hashing.
 
@@ -57,7 +64,7 @@ Before tests, the container proves exact `HEAD == base_revision` and a clean wor
 
 ## Audit, decision, and immutable admission
 
-`tools/ndv_validate_s2_audit.py` requires `AUDIT_PASS` evidence to include immutable image identity, harness integrity, expected base behavior, preservation PASS, verifier independence, no treatment/gold/test-patch contamination, and hashes for base run, oracle interpretation, focal verifier, preservation verifier, verifier provenance, **and environment evidence**.
+`tools/ndv_validate_s2_audit.py` requires `AUDIT_PASS` evidence to include immutable image identity, harness integrity, expected base behavior, preservation PASS, verifier independence, no treatment/gold/test-patch contamination, and hashes for base run, oracle interpretation, focal verifier, preservation verifier, verifier provenance, and environment evidence.
 
 `tools/ndv_decide_s2_admission.py` deterministically snapshots all evidence refs and hashes into `ndv-p1-s2-admission-decisions-v2`.
 
@@ -71,13 +78,13 @@ python tools/ndv_validate_corpus_intake.py experiments/p1/s2-candidate-wave-01.j
 
 The validator requires unique non-negative `source_row_index` and unique `source_instance_id` values.
 
-CI is `.github/workflows/wp06-corpus-intake-validation.yml`. It compiles and tests acquisition, extraction, original-index preservation, quarantine, base audit, oracle interpretation, verifier construction, audit validation, deterministic decision, and admission freeze. It performs no model calls, Parquet download, Docker candidate run, or treatment execution.
+CI is `.github/workflows/wp06-corpus-intake-validation.yml`. It compiles and tests acquisition, byte-bound materialization, extraction, original-index preservation, quarantine, base audit, oracle interpretation, verifier construction, audit validation, deterministic decision, and admission freeze. It performs no model calls, Parquet download, Docker candidate run, or treatment execution.
 
-Latest validated state: WP-06 CI run `35146225089` completed successfully after the byte-verified/stale-decision admission gates were added.
+Latest validated tooling state: GitHub Actions run `35147820090` completed successfully.
 
 ## Current gate
 
-`PINNED_PARQUET_ACQUISITION_PASS → INDEXED_FULL_ROW_EXTRACTION → QUARANTINE_PASS → HARNESS_VALID_BASE_RUN → EXPECTED_BASE_BEHAVIOR → HASHED_VERIFIER_EVIDENCE → AUDIT_PASS → SNAPSHOTTED_ADMISSION_DECISION → BYTE_VERIFIED_ADMITTED_FROZEN`.
+`PINNED_PARQUET_ACQUISITION_PASS → BYTE_BOUND_WAVE_MATERIALIZATION → INDEXED_FULL_ROW_EXTRACTION → QUARANTINE_PASS → HARNESS_VALID_BASE_RUN → EXPECTED_BASE_BEHAVIOR → HASHED_VERIFIER_EVIDENCE → AUDIT_PASS → SNAPSHOTTED_ADMISSION_DECISION → BYTE_VERIFIED_ADMITTED_FROZEN`.
 
 Current empirical state: the pinned Parquet has **not** been locally materialized/verified by NDV in this wave; no Wave-01 base Docker audit has been executed; no candidate is admitted; holdout access is `NONE`; treatment execution is `NOT_EXECUTED`.
 
