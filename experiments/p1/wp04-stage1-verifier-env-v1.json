@@ -1,0 +1,32 @@
+{
+  "schema_id": "ndv-p1-wp04-stage1-verifier-env-v1",
+  "task_id": "D-F5-01",
+  "historical_evidence_ref": "oigorbrito/dv@66f3a218fba800daed5d86fdfce386491b8ab0e8:pilot-runs/p1-w5-verifier-first-corpus-closure/d-f5-execution.json",
+  "python": {
+    "historical": "3.13.14",
+    "accepted_current": "3.13.x",
+    "reason": "patch-level drift is recorded; task metadata requires Python >=3.12"
+  },
+  "verifier_toolchain": {
+    "pip": "26.2.1",
+    "setuptools": "84.0.0"
+  },
+  "bootstrap_policy": {
+    "phase": "PRE_EXPOSURE_ONLY",
+    "network_allowed": true,
+    "purpose": "acquire only the exact pinned verifier build toolchain when not already available",
+    "packages_allowed": [
+      "pip==26.2.1",
+      "setuptools==84.0.0"
+    ],
+    "executor_or_model_download": false,
+    "task_exposed": false,
+    "after_bootstrap_editable_install": "OFFLINE_NO_INDEX_NO_DEPS_NO_BUILD_ISOLATION"
+  },
+  "failure_policy": {
+    "bootstrap_failure": "ENVIRONMENT_BLOCKED_PRE_EXPOSURE",
+    "editable_install_failure": "ENVIRONMENT_BLOCKED_PRE_EXPOSURE",
+    "baseline_preservation_failure": "ENVIRONMENT_DRIFT_PRE_EXPOSURE",
+    "none_count_as_executor_retry": true
+  }
+}
