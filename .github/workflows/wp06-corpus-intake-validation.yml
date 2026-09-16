@@ -1,0 +1,74 @@
+name: WP-06 Corpus Intake Validation
+
+on:
+  push:
+    paths:
+      - 'experiments/p1/s2-corpus-intake-v1.json'
+      - 'experiments/p1/s2-source-snapshot-01.json'
+      - 'experiments/p1/s2-candidate-wave-01.json'
+      - 'tools/ndv_validate_corpus_intake.py'
+      - 'tools/ndv_extract_pinned_swe_rebench_rows.py'
+      - 'tools/ndv_quarantine_swe_rebench_rows.py'
+      - 'tools/ndv_run_s2_base_audit.py'
+      - 'tools/ndv_interpret_s2_base_oracle.py'
+      - 'tools/ndv_build_s2_verifier_evidence.py'
+      - 'tools/test_ndv_validate_corpus_intake.py'
+      - 'tools/test_ndv_extract_pinned_swe_rebench_rows.py'
+      - 'tools/test_ndv_quarantine_swe_rebench_rows.py'
+      - 'tools/test_ndv_s2_quarantine_indices.py'
+      - 'tools/test_ndv_run_s2_base_audit.py'
+      - 'tools/test_ndv_interpret_s2_base_oracle.py'
+      - 'tools/test_ndv_build_s2_verifier_evidence.py'
+      - '.github/workflows/wp06-corpus-intake-validation.yml'
+  pull_request:
+    paths:
+      - 'experiments/p1/s2-corpus-intake-v1.json'
+      - 'experiments/p1/s2-source-snapshot-01.json'
+      - 'experiments/p1/s2-candidate-wave-01.json'
+      - 'tools/ndv_validate_corpus_intake.py'
+      - 'tools/ndv_extract_pinned_swe_rebench_rows.py'
+      - 'tools/ndv_quarantine_swe_rebench_rows.py'
+      - 'tools/ndv_run_s2_base_audit.py'
+      - 'tools/ndv_interpret_s2_base_oracle.py'
+      - 'tools/ndv_build_s2_verifier_evidence.py'
+      - 'tools/test_ndv_validate_corpus_intake.py'
+      - 'tools/test_ndv_extract_pinned_swe_rebench_rows.py'
+      - 'tools/test_ndv_quarantine_swe_rebench_rows.py'
+      - 'tools/test_ndv_s2_quarantine_indices.py'
+      - 'tools/test_ndv_run_s2_base_audit.py'
+      - 'tools/test_ndv_interpret_s2_base_oracle.py'
+      - 'tools/test_ndv_build_s2_verifier_evidence.py'
+      - '.github/workflows/wp06-corpus-intake-validation.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Compile S2 admission tooling
+        run: |
+          python -m py_compile tools/ndv_validate_corpus_intake.py
+          python -m py_compile tools/ndv_extract_pinned_swe_rebench_rows.py
+          python -m py_compile tools/ndv_quarantine_swe_rebench_rows.py
+          python -m py_compile tools/ndv_run_s2_base_audit.py
+          python -m py_compile tools/ndv_interpret_s2_base_oracle.py
+          python -m py_compile tools/ndv_build_s2_verifier_evidence.py
+      - name: Validate frozen candidate wave
+        run: python tools/ndv_validate_corpus_intake.py experiments/p1/s2-candidate-wave-01.json
+      - name: Run S2 admission unit tests
+        working-directory: tools
+        run: |
+          python -m unittest -v test_ndv_validate_corpus_intake.py
+          python -m unittest -v test_ndv_extract_pinned_swe_rebench_rows.py
+          python -m unittest -v test_ndv_quarantine_swe_rebench_rows.py
+          python -m unittest -v test_ndv_s2_quarantine_indices.py
+          python -m unittest -v test_ndv_run_s2_base_audit.py
+          python -m unittest -v test_ndv_interpret_s2_base_oracle.py
+          python -m unittest -v test_ndv_build_s2_verifier_evidence.py
