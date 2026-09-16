@@ -15,7 +15,6 @@ import argparse
 import hashlib
 import json
 import time
-import urllib.error
 import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
@@ -81,9 +80,9 @@ def make_binding(probe: dict[str, Any], model: dict[str, Any], qualification_ref
         "telemetry_mode": "OLLAMA_NATIVE_RESPONSE_FIELDS_OR_EXPLICIT_MISSINGNESS",
         "candidate_capture_mode": "RAW_RESPONSE_AND_EXTRACTED_TEXT",
         "network_policy": "LOCAL_LOOPBACK_ONLY",
-        "automatic_download": false,
-        "dynamic_routing": false,
-        "implicit_fallback": false,
+        "automatic_download": False,
+        "dynamic_routing": False,
+        "implicit_fallback": False,
         "retry_limit": 0,
         "escalation_limit": 0,
         "task_shaping": "S0_RAW_TASK",
@@ -119,7 +118,7 @@ def main() -> int:
             raise ValueError(f"runtime reported unexpected model identity: {observed_model!r}")
         status = "S0_READY"
         error = None
-    except Exception as exc:  # qualification evidence must persist blockers too
+    except Exception as exc:
         response, raw, elapsed, candidate = {}, b"", 0.0, None
         status = "S0_FAIL"
         error = f"{type(exc).__name__}: {exc}"
@@ -140,9 +139,9 @@ def main() -> int:
         "raw_response_sha256": sha256_bytes(raw),
         "response": response,
         "candidate_text": candidate,
-        "downloads_performed": false,
-        "credentials_used": false,
-        "p1_task_exposed": false,
+        "downloads_performed": False,
+        "credentials_used": False,
+        "p1_task_exposed": False,
         "holdout_access": "NONE",
     }
     encoded = json.dumps(evidence, indent=2, sort_keys=True, ensure_ascii=False) + "\n"
