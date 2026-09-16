@@ -86,9 +86,12 @@ Stage 2 has **not** been executed. Its task contract and runner are frozen. Befo
 2. the same original binding used in Stage 1;
 3. the exact Aider executable path frozen in that binding;
 4. `aider --version` to exactly match the frozen Aider version;
-5. discriminating structural focal failure on the untouched historical base;
-6. all frozen Rust baseline oracle checks to pass;
-7. zero retry/escalation and sealed holdout.
+5. Ollama endpoint, installed model identity and model digest to exactly match the frozen binding;
+6. discriminating structural focal failure on the untouched historical base;
+7. all frozen Rust baseline oracle checks to pass;
+8. zero retry/escalation and sealed holdout.
+
+The Ollama identity gate reads only the local `/api/tags` inventory and aborts before task materialization/exposure if the endpoint, model name or digest has drifted. It does not download, retag, update or repair the model.
 
 The Stage-1 artifact inventory shape is aligned with the canonical v2 importer format: a list of `{path, size_bytes, sha256}` records. This fixes the prior inconsistency where the Stage-2 runner expected a dict/`bytes` shape that the official importer never emitted.
 
@@ -129,4 +132,4 @@ COMPARATIVE_AUTHORITY = NONE
 ARCHITECTURE_AUTHORITY = NONE
 ```
 
-The next execution gate is: import the **original** binding-v2 bytes, create/revalidate the Stage-1 v2 sidecar, and only then run D-F6-01 once with that exact binding. No Stage-2 exposure is authorized if the binding/sidecar/hash/scaffold gates fail.
+The next execution gate is: import the **original** binding-v2 bytes, create/revalidate the Stage-1 v2 sidecar, and only then run D-F6-01 once with that exact binding. No Stage-2 exposure is authorized if the binding/sidecar/hash/scaffold/model gates fail.
