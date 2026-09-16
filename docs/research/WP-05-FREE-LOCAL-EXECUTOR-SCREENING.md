@@ -7,7 +7,7 @@ Identify executor surfaces that can enter later NDV experiments without requirin
 ## Current strategy
 
 1. Probe the local machine first, without downloads and without credentials.
-2. If a local Ollama runtime and installed model exist, qualify that exact model/digest.
+2. If a local Ollama runtime and installed model exist, qualify that exact model/digest on a synthetic non-P1 task.
 3. Only if useful, consider downloading a pinned local model after machine fit is known.
 4. Hosted-free candidates are screened separately and require exact model identity; dynamic routers such as `openrouter/free` are exploration-only.
 
@@ -27,6 +27,38 @@ Possible first classifications:
 - `S0_DOWNLOAD_REQUIRED` — Ollama exists, but no installed model is available.
 - `S0_LOCAL_SURFACE_DISCOVERED` — installed models were found; each still needs executor-level qualification.
 
+## Local Ollama qualification
+
+When the probe reports one or more installed models, choose the **exact model name already present in the probe** and run:
+
+```powershell
+python tools/ndv_qualify_local_ollama_executor.py `
+  --probe .ndv-probes/local-surface.json `
+  --model <exact-installed-model-name> `
+  --out .ndv-probes/qualification/<model>.json `
+  --binding-out .ndv-probes/bindings/wp04-local-ollama.json
+```
+
+This qualification step:
+
+- never calls `ollama pull` or any other download path;
+- sends one fixed synthetic coding prompt unrelated to P1 tasks or holdout data;
+- requires the exact installed model name and digest discovered by the probe;
+- requires the model to produce the frozen expected unified diff;
+- persists raw response identity/timing/usage fields when Ollama exposes them;
+- records explicit missingness rather than treating absent telemetry as zero;
+- emits a WP-04 binding only on `S0_READY`;
+- otherwise persists `S0_FAIL` evidence and emits no binding.
+
+A generated binding must then pass:
+
+```powershell
+python tools/ndv_validate_wp04_smoke.py `
+  --binding .ndv-probes/bindings/wp04-local-ollama.json
+```
+
+This creates the direct bridge from WP-05 to the already frozen WP-04 pipeline smoke contract.
+
 ## Hosted-free candidate universe
 
 As of 2026-09-16, the prospective pinned candidates are recorded in `experiments/p1/free-local-executor-screening-v1.json`. Discovery is not qualification.
@@ -44,6 +76,7 @@ For local execution, also retain hardware identity, runtime/model digest, quanti
 - Do not silently download a large model during screening.
 - Do not treat missing telemetry as zero.
 - Do not select models based on performance on admitted P1 tasks before the candidate universe is frozen.
+- Do not generate a WP-04 binding from discovery metadata alone; the synthetic qualification must pass first.
 
 ## Gate
 
@@ -53,3 +86,14 @@ WP-05 is complete when at least one additional free/local executor surface is ei
 - rejected/blocked with auditable evidence.
 
 A blocked outcome is valid; this work package exists to establish what is actually available, not to force a free/local treatment into P1.
+
+## Current status
+
+```text
+LOCAL_SURFACE_PROBE = IMPLEMENTED
+LOCAL_OLLAMA_QUALIFIER = IMPLEMENTED
+WP04_BINDING_BRIDGE = IMPLEMENTED
+REAL_MACHINE_PROBE = NOT_YET_OBSERVED
+REAL_EXECUTOR_BINDING = NOT_YET_FROZEN
+P1_TASK_EXPOSURE = NONE
+```
