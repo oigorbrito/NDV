@@ -1,0 +1,73 @@
+{
+  "schema_id": "ndv-p1-s2-verifier-environment-audit-v1",
+  "wave_ref": "experiments/p1/s2-candidate-wave-01.json",
+  "purpose": "Audit verifier provenance, environment identity, base behavior, preservation behavior, and solution isolation before admission.",
+  "upstream_harness": {
+    "repository": "SWE-rebench/SWE-rebench-V2",
+    "revision": "c71902a8cf8d2b725f63d51f199f4d3e56f68d2d",
+    "path": "scripts/eval.py",
+    "git_blob_sha": "d2746a2ebfcf11f29d0ea6b30142b709f734fcb5",
+    "classification": "GOLD_PATCH_EVALUATOR_NOT_BASE_VERIFIER",
+    "reason": "evaluate_instance applies patch and test_patch before running install_config.test_cmd; therefore its ordinary path cannot establish pre-solution base behavior."
+  },
+  "audit_requirements": [
+    "quarantine_status PASS",
+    "full admission-only row available",
+    "executor-visible row remains isolated",
+    "container image tag resolved to immutable digest",
+    "upstream harness revision and verifier/parser code identity frozen",
+    "install_config.test_cmd captured from admission-only row",
+    "install_config.log_parser captured and implementation identity frozen",
+    "base-mode runs test commands without applying gold patch",
+    "expected base behavior observed and recorded",
+    "focal verifier evidence identifies at least one fail-to-pass expectation where applicable",
+    "preservation baseline is executable and recorded",
+    "candidate patch/gold patch is never exposed to executor during admission",
+    "infrastructure failure is distinguishable from oracle/product failure"
+  ],
+  "base_mode": {
+    "gold_patch_application": "FORBIDDEN",
+    "test_patch_application": "PREREGISTER_PER_TASK_AFTER_LEAKAGE_AUDIT",
+    "default": "Run frozen test command(s) in the pinned image at the frozen repository base state without applying solution patch.",
+    "pass_condition": "Observed base behavior matches the preregistered expected failing/passing structure required by the task contract.",
+    "failure_condition": "If base behavior cannot be reproduced, reject or mark environment/oracle blocker; do not repair using treatment output."
+  },
+  "image_policy": {
+    "tag_is_identity": false,
+    "required": ["image_ref", "resolved_digest", "runtime", "pull_or_build_evidence", "observed_at"],
+    "rule": "Comparative evidence must bind to an immutable image digest, not only a mutable tag."
+  },
+  "verifier_provenance": {
+    "required": [
+      "test_command_source",
+      "test_command_value",
+      "log_parser_name",
+      "log_parser_source_ref",
+      "log_parser_sha256_or_blob_sha",
+      "expected_focal_tests_source",
+      "preservation_tests_source"
+    ],
+    "independence_rule": "Verifier artifacts may originate from benchmark/task metadata but must be frozen before any treatment execution and must not be synthesized from treatment output."
+  },
+  "candidate_audit_statuses": [
+    "WAITING_QUARANTINE",
+    "READY_FOR_ENVIRONMENT_AUDIT",
+    "ENVIRONMENT_BLOCKED",
+    "ORACLE_BLOCKED",
+    "AUDIT_PASS",
+    "REJECTED"
+  ],
+  "admission_gate": {
+    "required_status": "AUDIT_PASS",
+    "required_fields": [
+      "image_digest",
+      "base_run_ref",
+      "base_run_sha256",
+      "focal_verifier_ref",
+      "preservation_ref",
+      "verifier_provenance_ref",
+      "environment_ref"
+    ]
+  },
+  "treatment_execution": "FORBIDDEN"
+}
