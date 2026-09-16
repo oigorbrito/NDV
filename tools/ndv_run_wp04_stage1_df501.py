@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Run WP-04 Stage 1 (D-F5-01) with one frozen binding-v2.
 
-This runner is intentionally narrow. It materializes the exact base revision,
-invokes the frozen Aider+Ollama surface once, captures the candidate diff, runs
-independent focal/preservation verification, and emits one evidence bundle.
+Flow: exact base -> frozen offline environment setup -> baseline preservation PASS
+and structural focal FAIL -> one Aider+Ollama execution -> candidate capture ->
+structural focal + preservation verification -> accounting and attribution.
 No retry, fallback, escalation, or holdout access is implemented.
 """
 from __future__ import annotations
@@ -14,12 +14,14 @@ import json
 import os
 import shutil
 import subprocess
+import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 TASK_PATH = Path("experiments/p1/wp04-stage1-d-f5-01-v1.json")
+STRUCTURAL_VERIFIER = Path(__file__).with_name("ndv_verify_df501_structural.py").resolve()
 
 
 def load(path: Path) -> Any:
@@ -40,19 +42,25 @@ def require_clean_exact_base(workspace: Path, base_sha: str) -> None:
         raise RuntimeError(f"workspace HEAD mismatch: expected {base_sha}, observed {head.stdout.strip()!r}")
     status = run(["git", "status", "--porcelain"], workspace, 30)
     if status.returncode != 0 or status.stdout.strip():
-        raise RuntimeError("workspace must be clean before executor exposure")
+        raise RuntimeError(f"workspace must be clean before executor exposure: {status.stdout!r}")
 
 
-def classify(focal_rc: int | None, preservation_rc: int | None, executor_rc: int | None, timed_out: bool) -> tuple[str, str]:
+def venv_python(venv: Path) -> Path:
+    return venv / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
+
+
+def write_log(path: Path, proc: subprocess.CompletedProcess[str]) -> None:
+    path.write_text((proc.stdout or "") + ("\n[stderr]\n" + proc.stderr if proc.stderr else ""), encoding="utf-8")
+
+
+def classify(focal_rc: int, preservation_rc: int, executor_rc: int, timed_out: bool) -> tuple[str, str]:
     if timed_out:
         return "SMOKE_INCONCLUSIVE", "RESOURCE_LIMIT"
-    if executor_rc not in (0, None):
+    if executor_rc != 0:
         return "SMOKE_INCONCLUSIVE", "PROVIDER_FAILURE"
     if focal_rc == 0 and preservation_rc == 0:
         return "SMOKE_VALID_SOLVED", "NONE"
-    if focal_rc is not None and preservation_rc is not None:
-        return "SMOKE_VALID_FAILED", "PRODUCT_FAILURE"
-    return "SMOKE_INCONCLUSIVE", "HARNESS_FAILURE"
+    return "SMOKE_VALID_FAILED", "PRODUCT_FAILURE"
 
 
 def main() -> int:
@@ -79,6 +87,7 @@ def main() -> int:
 
     out = args.out_dir.resolve()
     workspace = out / "workspace"
+    venv = out / "verifier-venv"
     evidence_dir = out / "evidence"
     if out.exists():
         raise SystemExit(f"out-dir already exists; refusing overwrite: {out}")
@@ -90,6 +99,30 @@ def main() -> int:
     checkout = run(["git", "checkout", "--detach", task["base_sha"]], workspace, 120)
     if checkout.returncode != 0:
         raise SystemExit(f"checkout failed: {checkout.stderr or checkout.stdout}")
+    require_clean_exact_base(workspace, task["base_sha"])
+
+    # Reproduce the historically admitted offline verifier environment.
+    create_venv = run([sys.executable, "-m", "venv", "--system-site-packages", str(venv)], timeout=180)
+    write_log(evidence_dir / "environment-venv.log", create_venv)
+    if create_venv.returncode != 0:
+        raise SystemExit("verifier venv creation failed before task exposure")
+    py = str(venv_python(venv))
+    install = run([py, "-m", "pip", "install", "--no-index", "--no-deps", "--no-build-isolation", "--editable", str(workspace)], workspace, 300)
+    write_log(evidence_dir / "environment-install.log", install)
+    if install.returncode != 0:
+        raise SystemExit("frozen offline editable install failed before task exposure")
+    require_clean_exact_base(workspace, task["base_sha"])
+
+    # Oracle discriminability gate: base must fail focal but pass preservation.
+    base_focal = run([sys.executable, str(STRUCTURAL_VERIFIER), "--workspace", str(workspace)], timeout=60)
+    write_log(evidence_dir / "baseline-focal.log", base_focal)
+    if base_focal.returncode == 0:
+        raise SystemExit("ORACLE_DEFECT: structural focal unexpectedly passes on untouched base")
+    preservation_argv = [py, "-B", "-m", "unittest", "discover", "-s", "tests/unit"]
+    base_preservation = run(preservation_argv, workspace, 1800)
+    write_log(evidence_dir / "baseline-preservation.log", base_preservation)
+    if base_preservation.returncode != 0:
+        raise SystemExit("ENVIRONMENT_DRIFT: baseline preservation failed before task exposure")
     require_clean_exact_base(workspace, task["base_sha"])
 
     started = datetime.now(timezone.utc).isoformat()
@@ -117,21 +150,16 @@ def main() -> int:
         executor = subprocess.CompletedProcess(exc.cmd, 124, stdout=exc.stdout or "", stderr=exc.stderr or "")
         timed_out = True
     executor_seconds = time.monotonic() - t0
+    write_log(evidence_dir / "executor.log", executor)
 
     diff_proc = run(["git", "diff", "--binary"], workspace, 60)
     diff_text = diff_proc.stdout
     (evidence_dir / "candidate.diff").write_text(diff_text, encoding="utf-8")
-    (evidence_dir / "executor.stdout.log").write_text(executor.stdout or "", encoding="utf-8")
-    (evidence_dir / "executor.stderr.log").write_text(executor.stderr or "", encoding="utf-8")
 
-    focal_argv = task["verifier"]["focal"]
-    preservation_argv = task["verifier"]["preservation"]
-    focal = run(focal_argv, workspace, 900)
+    focal = run([sys.executable, str(STRUCTURAL_VERIFIER), "--workspace", str(workspace)], timeout=60)
+    write_log(evidence_dir / "candidate-focal.log", focal)
     preservation = run(preservation_argv, workspace, 1800)
-    (evidence_dir / "focal.stdout.log").write_text(focal.stdout or "", encoding="utf-8")
-    (evidence_dir / "focal.stderr.log").write_text(focal.stderr or "", encoding="utf-8")
-    (evidence_dir / "preservation.stdout.log").write_text(preservation.stdout or "", encoding="utf-8")
-    (evidence_dir / "preservation.stderr.log").write_text(preservation.stderr or "", encoding="utf-8")
+    write_log(evidence_dir / "candidate-preservation.log", preservation)
 
     outcome, attribution = classify(focal.returncode, preservation.returncode, executor.returncode, timed_out)
     report = {
@@ -147,32 +175,36 @@ def main() -> int:
         "retry_count": 0,
         "escalation_count": 0,
         "holdout_access": "NONE",
+        "baseline_gate": {
+            "structural_focal_expected_fail_returncode": base_focal.returncode,
+            "preservation_returncode": base_preservation.returncode,
+            "environment_setup": "venv --system-site-packages + offline editable install"
+        },
         "executor": {
             "argv_redacted_task": [aider, "--model", f"ollama_chat/{model_name}", "--message", "<FROZEN_RAW_TASK>", "..."],
             "returncode": executor.returncode,
             "timed_out": timed_out,
             "wall_seconds": executor_seconds,
-            "stdout_ref": "evidence/executor.stdout.log",
-            "stderr_ref": "evidence/executor.stderr.log"
+            "log_ref": "evidence/executor.log"
         },
         "candidate": {
             "diff_ref": "evidence/candidate.diff",
             "diff_sha256": sha256_text(diff_text),
-            "diff_bytes": len(diff_text.encode("utf-8")),
+            "diff_bytes": len(diff_text.encode("utf-8"))
         },
         "verification": {
-            "focal": {"argv": focal_argv, "returncode": focal.returncode, "stdout_ref": "evidence/focal.stdout.log", "stderr_ref": "evidence/focal.stderr.log"},
-            "preservation": {"argv": preservation_argv, "returncode": preservation.returncode, "stdout_ref": "evidence/preservation.stdout.log", "stderr_ref": "evidence/preservation.stderr.log"}
+            "focal": {"kind": "EXTERNAL_REQUIREMENT_STRUCTURAL", "returncode": focal.returncode, "log_ref": "evidence/candidate-focal.log"},
+            "preservation": {"argv": preservation_argv, "returncode": preservation.returncode, "log_ref": "evidence/candidate-preservation.log"}
         },
         "accounting": {
             "executor_wall_seconds": executor_seconds,
-            "token_usage": "EXPLICIT_MISSINGNESS_UNLESS_PRESENT_IN_EXECUTOR_LOGS",
+            "token_usage": "EXPLICIT_MISSINGNESS_UNLESS_PRESENT_IN_EXECUTOR_LOG",
             "monetary_cost": "LOCAL_COST_NOT_CONVERTED_TO_TOKENS",
             "failure_resources_retained": True
         },
         "outcome": outcome,
         "failure_attribution": attribution,
-        "stage2_release": "YES" if outcome in {"SMOKE_VALID_SOLVED", "SMOKE_VALID_FAILED", "SMOKE_INCONCLUSIVE"} else "NO"
+        "stage2_release": "YES"
     }
     (out / "run-report.json").write_text(json.dumps(report, indent=2, sort_keys=True, ensure_ascii=False) + "\n", encoding="utf-8")
     print(json.dumps({"outcome": outcome, "failure_attribution": attribution, "report": str(out / "run-report.json")}, indent=2))
