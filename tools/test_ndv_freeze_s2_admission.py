@@ -22,41 +22,57 @@ class AdmissionFreezeTests(unittest.TestCase):
             "focal_verifier_ref": "focal.json", "focal_verifier_sha256": "2" * 64,
             "preservation_ref": "pres.json", "preservation_sha256": "3" * 64,
             "verifier_provenance_ref": "prov.json", "verifier_provenance_sha256": "4" * 64,
-            "environment_ref": "env.json",
+            "environment_ref": "env.json", "environment_sha256": "5" * 64,
         }
         decision = {"candidate_id": "c1", "decision": "ADMIT", "blockers": []}
-        return candidate, audit, decision
+        integrity = {
+            "admission_only_file_sha256": "6" * 64, "executor_visible_file_sha256": "7" * 64,
+            "quarantine_manifest_file_sha256": "8" * 64, "base_run_file_sha256": "f" * 64,
+            "oracle_interpretation_file_sha256": "1" * 64, "environment_file_sha256": "5" * 64,
+        }
+        return candidate, audit, decision, integrity
 
     def test_complete_record_freezes_and_binds_source(self):
-        candidate, audit, decision = self.complete(); record = freeze(candidate, audit, decision)
+        candidate, audit, decision, integrity = self.complete(); record = freeze(candidate, audit, decision, integrity)
         self.assertEqual(record["schema_id"], "ndv-p1-s2-admission-record-v2")
         self.assertEqual(record["status"], "ADMITTED_FROZEN")
         self.assertEqual(record["source_row_index"], 7)
         self.assertEqual(record["source_binding"]["ndv_canonical_row_sha256"], "c" * 64)
         self.assertEqual(record["audit"]["harness_integrity"], "PASS")
+        self.assertEqual(record["audit"]["environment_sha256"], "5" * 64)
+        self.assertEqual(record["artifact_integrity"]["status"], "VERIFIED")
         self.assertEqual(len(record["record_sha256"]), 64)
         self.assertFalse(record["selection"]["treatment_performance_consulted"])
 
+    def test_declared_metadata_without_verified_bytes_cannot_freeze(self):
+        candidate, audit, decision, _ = self.complete()
+        with self.assertRaisesRegex(ValueError, "verified artifact integrity"):
+            freeze(candidate, audit, decision)
+
     def test_blocked_decision_cannot_freeze(self):
-        candidate, audit, decision = self.complete(); decision["decision"] = "DO_NOT_ADMIT"; decision["blockers"] = ["X"]
-        with self.assertRaisesRegex(ValueError, "unblocked ADMIT"): freeze(candidate, audit, decision)
+        candidate, audit, decision, integrity = self.complete(); decision["decision"] = "DO_NOT_ADMIT"; decision["blockers"] = ["X"]
+        with self.assertRaisesRegex(ValueError, "unblocked ADMIT"): freeze(candidate, audit, decision, integrity)
 
     def test_harness_failure_cannot_freeze(self):
-        candidate, audit, decision = self.complete(); audit["harness_integrity"] = "FAIL"
-        with self.assertRaisesRegex(ValueError, "harness_integrity=PASS"): freeze(candidate, audit, decision)
+        candidate, audit, decision, integrity = self.complete(); audit["harness_integrity"] = "FAIL"
+        with self.assertRaisesRegex(ValueError, "harness_integrity=PASS"): freeze(candidate, audit, decision, integrity)
 
     def test_treatment_contamination_cannot_freeze(self):
-        candidate, audit, decision = self.complete(); audit["treatment_execution"] = "EXECUTED"
-        with self.assertRaisesRegex(ValueError, "treatment contamination"): freeze(candidate, audit, decision)
+        candidate, audit, decision, integrity = self.complete(); audit["treatment_execution"] = "EXECUTED"
+        with self.assertRaisesRegex(ValueError, "treatment contamination"): freeze(candidate, audit, decision, integrity)
 
     def test_missing_evidence_cannot_freeze(self):
-        candidate, audit, decision = self.complete(); audit["focal_verifier_sha256"] = None
-        with self.assertRaisesRegex(ValueError, "must be 64-hex"): freeze(candidate, audit, decision)
+        candidate, audit, decision, integrity = self.complete(); audit["focal_verifier_sha256"] = None
+        with self.assertRaisesRegex(ValueError, "must be 64-hex"): freeze(candidate, audit, decision, integrity)
+
+    def test_environment_hash_cannot_be_missing(self):
+        candidate, audit, decision, integrity = self.complete(); audit["environment_sha256"] = None
+        with self.assertRaisesRegex(ValueError, "environment_sha256"):
+            freeze(candidate, audit, decision, integrity)
 
     def test_discovery_identity_mismatch_rejected(self):
-        candidate, audit, decision = self.complete(); audit["candidate_id"] = "other"
-        with self.assertRaisesRegex(ValueError, "identity mismatch"): freeze(candidate, audit, decision)
+        candidate, audit, decision, integrity = self.complete(); audit["candidate_id"] = "other"
+        with self.assertRaisesRegex(ValueError, "identity mismatch"): freeze(candidate, audit, decision, integrity)
 
 
-if __name__ == "__main__":
-    unittest.main()
+if __name__ == "__main__": unittest.main()
