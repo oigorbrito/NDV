@@ -1,0 +1,24 @@
+{
+  "schema_id": "ndv-p1-s2-parquet-acquisition-v1",
+  "source_snapshot_ref": "experiments/p1/s2-source-snapshot-01.json",
+  "source_id": "SRC-SWE-REBENCH-V2",
+  "transport": "HTTPS_EXPLICIT_OPERATOR_ACTION",
+  "remote_url_template": "https://huggingface.co/datasets/{dataset}/resolve/{revision}/{parquet_path}",
+  "integrity_requirements": [
+    "dataset matches source snapshot",
+    "revision is exact pinned 40-hex commit",
+    "parquet path matches source snapshot",
+    "downloaded byte size matches frozen remote size",
+    "downloaded SHA-256 matches frozen parquet SHA-256"
+  ],
+  "write_policy": {
+    "partial_suffix": ".part",
+    "finalize": "ATOMIC_RENAME_AFTER_SIZE_AND_SHA256_PASS",
+    "existing_exact_file": "REUSE_WITH_REVERIFICATION",
+    "existing_mismatch": "FAIL_CLOSED_NO_OVERWRITE"
+  },
+  "credentials": "NOT_REQUIRED_FOR_PUBLIC_SOURCE",
+  "model_execution": "NONE",
+  "treatment_execution": "NOT_EXECUTED",
+  "holdout_access": "NONE"
+}
