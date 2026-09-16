@@ -1,0 +1,83 @@
+name: WP-03 Deterministic Harness Smoke
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/wp03-deterministic-harness-smoke.yml'
+      - 'tools/ndv_deterministic_harness_smoke.py'
+      - 'experiments/p1/deterministic-harness-smoke-v1.json'
+      - 'provenance/dv-legacy-manifest.json'
+
+permissions:
+  contents: read
+
+jobs:
+  deterministic-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout NDV
+        uses: actions/checkout@v4
+        with:
+          path: NDV
+
+      - name: Checkout frozen legacy DV
+        uses: actions/checkout@v4
+        with:
+          repository: oigorbrito/dv
+          ref: 66f3a218fba800daed5d86fdfce386491b8ab0e8
+          path: dv
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Verify frozen legacy harness blob
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C dv rev-parse HEAD)" = "66f3a218fba800daed5d86fdfce386491b8ab0e8"
+          test "$(git -C dv hash-object tools/dv_pilot_harness.py)" = "0f7f936e46dbaccf243b6b77dd6014eedeb076cf"
+
+      - name: Execute deterministic smoke
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/wp03
+          python NDV/tools/ndv_deterministic_harness_smoke.py \
+            --legacy-dv-root dv \
+            --out artifacts/wp03 | tee artifacts/wp03/console.log
+
+      - name: Publish summary
+        if: always()
+        shell: bash
+        run: |
+          if [ -f artifacts/wp03/ndv-deterministic-harness-smoke-report.json ]; then
+            python - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json
+          from pathlib import Path
+          p = Path('artifacts/wp03/ndv-deterministic-harness-smoke-report.json')
+          d = json.loads(p.read_text())
+          print('# WP-03 Deterministic Harness Smoke')
+          print(f"\n**Status:** {d['status']}\n")
+          print('| Case | Pass | Outcome |')
+          print('|---|---:|---|')
+          for c in d['cases']:
+              print(f"| {c['case_id']} | {c['pass']} | {c.get('verification', {}).get('outcome')} |")
+          PY
+          else
+            echo '# WP-03 Deterministic Harness Smoke' >> "$GITHUB_STEP_SUMMARY"
+            echo '' >> "$GITHUB_STEP_SUMMARY"
+            echo '**Status:** NO_REPORT' >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: wp03-deterministic-harness-smoke
+          path: artifacts/wp03
+          if-no-files-found: error
+          retention-days: 30
