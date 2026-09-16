@@ -3,8 +3,8 @@
 
 This command performs no network access, Docker execution, model call, treatment,
 or holdout access. It verifies the acquisition receipt against the exact snapshot,
-contract, and Parquet bytes, then invokes the pinned extractor with quarantine and
-writes a byte-bound materialization receipt.
+contract, Parquet bytes, and frozen extraction environment, then invokes the
+pinned extractor with quarantine and writes a byte-bound materialization receipt.
 """
 from __future__ import annotations
 
@@ -71,10 +71,27 @@ def verify_acquisition(parquet: Path, receipt_path: Path, snapshot_path: Path, c
     return {"parquet_sha256": actual_sha, "parquet_size_bytes": actual_size, "receipt_file_sha256": sha256_file(receipt_path), "snapshot_file_sha256": sha256_file(snapshot_path), "contract_file_sha256": sha256_file(contract_path)}
 
 
-def run_extraction(extractor: Path, parquet: Path, snapshot: Path, wave: Path, rows_out: Path, quarantine_out: Path) -> subprocess.CompletedProcess[str]:
+def verify_environment(path: Path) -> dict[str, Any]:
+    path = require_file(path, "extraction environment")
+    cfg = load(path)
+    if not isinstance(cfg, dict) or cfg.get("schema_id") != "ndv-p1-s2-extraction-environment-v1":
+        raise ValueError("unexpected extraction environment schema")
+    py = cfg.get("python", {})
+    if (py.get("required_major"), py.get("required_minor")) != sys.version_info[:2]:
+        raise ValueError(f"materialization requires Python {py.get('required_major')}.{py.get('required_minor')}.x")
+    pyarrow_version = cfg.get("pyarrow", {}).get("required_version")
+    if not isinstance(pyarrow_version, str) or not pyarrow_version:
+        raise ValueError("extraction environment missing pyarrow version")
+    if cfg.get("network_during_extraction") != "FORBIDDEN" or cfg.get("model_execution") != "NONE" or cfg.get("treatment_execution") != "NOT_EXECUTED" or cfg.get("holdout_access") != "NONE":
+        raise ValueError("extraction environment permits forbidden activity")
+    return {"environment_ref": str(path), "environment_file_sha256": sha256_file(path), "python_version": sys.version.split()[0], "required_pyarrow_version": pyarrow_version}
+
+
+def run_extraction(extractor: Path, parquet: Path, snapshot: Path, wave: Path, environment: Path, rows_out: Path, quarantine_out: Path) -> subprocess.CompletedProcess[str]:
     return subprocess.run([
         sys.executable, str(extractor), "--parquet", str(parquet), "--snapshot", str(snapshot),
-        "--wave", str(wave), "--out", str(rows_out), "--quarantine-out", str(quarantine_out),
+        "--wave", str(wave), "--environment", str(environment), "--out", str(rows_out),
+        "--quarantine-out", str(quarantine_out),
     ], text=True, capture_output=True, check=False)
 
 
@@ -85,18 +102,27 @@ def main() -> int:
     ap.add_argument("--snapshot", type=Path, default=Path("experiments/p1/s2-source-snapshot-01.json"))
     ap.add_argument("--contract", type=Path, default=Path("experiments/p1/s2-parquet-acquisition-v1.json"))
     ap.add_argument("--wave", type=Path, default=Path("experiments/p1/s2-candidate-wave-01.json"))
+    ap.add_argument("--environment", type=Path, default=Path("experiments/p1/s2-extraction-environment-v1.json"))
     ap.add_argument("--out-root", type=Path, default=Path(".ndv-corpus/s2-w01"))
     ap.add_argument("--extractor", type=Path, default=Path("tools/ndv_extract_pinned_swe_rebench_rows.py"))
     args = ap.parse_args()
     try:
         integrity = verify_acquisition(args.parquet, args.acquisition_receipt, args.snapshot, args.contract)
+        environment = verify_environment(args.environment)
     except (OSError, ValueError, json.JSONDecodeError) as exc:
-        print(json.dumps({"status": "FAIL", "reason": "ACQUISITION_BINDING_INVALID", "detail": str(exc)}, indent=2)); return 2
+        print(json.dumps({"status": "FAIL", "reason": "PRE_MATERIALIZATION_BINDING_INVALID", "detail": str(exc)}, indent=2)); return 2
 
     root = args.out_root.resolve(); rows_out = root / "pinned-rows.jsonl"; quarantine_out = root / "quarantine"
-    proc = run_extraction(args.extractor, args.parquet, args.snapshot, args.wave, rows_out, quarantine_out)
+    proc = run_extraction(args.extractor, args.parquet, args.snapshot, args.wave, args.environment, rows_out, quarantine_out)
     if proc.returncode != 0:
         print(json.dumps({"status": "FAIL", "reason": "EXTRACTION_OR_QUARANTINE_FAILED", "exit_code": proc.returncode, "stdout": proc.stdout.strip(), "stderr": proc.stderr.strip()}, indent=2)); return 2
+    try:
+        extraction = json.loads(proc.stdout)
+    except json.JSONDecodeError:
+        print(json.dumps({"status": "FAIL", "reason": "EXTRACTION_RESULT_NOT_JSON"}, indent=2)); return 2
+    if extraction.get("status") != "PASS" or extraction.get("schema_id") != "ndv-p1-s2-pinned-row-extraction-v3" or extraction.get("environment_file_sha256") != environment["environment_file_sha256"] or extraction.get("pyarrow_version") != environment["required_pyarrow_version"]:
+        print(json.dumps({"status": "FAIL", "reason": "EXTRACTION_ENVIRONMENT_BINDING_INVALID"}, indent=2)); return 2
+
     aggregate = quarantine_out / "quarantine-aggregate.json"
     if not rows_out.is_file() or not aggregate.is_file():
         print(json.dumps({"status": "FAIL", "reason": "EXPECTED_MATERIALIZATION_ARTIFACT_MISSING"}, indent=2)); return 2
@@ -106,9 +132,12 @@ def main() -> int:
         print(json.dumps({"status": "FAIL", "reason": "QUARANTINE_AGGREGATE_INVALID"}, indent=2)); return 2
 
     receipt = {
-        "schema_id": "ndv-p1-s2-wave-materialization-receipt-v1", "status": "MATERIALIZED_QUARANTINED",
+        "schema_id": "ndv-p1-s2-wave-materialization-receipt-v2", "status": "MATERIALIZED_QUARANTINED",
         "wave_id": wave.get("wave_id"), "wave_file_sha256": sha256_file(args.wave),
-        "acquisition": integrity, "rows_ref": str(rows_out), "rows_file_sha256": sha256_file(rows_out),
+        "acquisition": integrity, "extraction_environment": environment,
+        "extraction_schema": extraction.get("schema_id"), "extraction_python_version": extraction.get("python_version"),
+        "extraction_pyarrow_version": extraction.get("pyarrow_version"),
+        "rows_ref": str(rows_out), "rows_file_sha256": sha256_file(rows_out),
         "quarantine_aggregate_ref": str(aggregate), "quarantine_aggregate_file_sha256": sha256_file(aggregate),
         "candidate_count": q.get("candidate_count"), "passed_count": q.get("passed_count"),
         "network_used": False, "docker_execution": False, "model_execution": "NONE",
