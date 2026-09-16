@@ -1,0 +1,18 @@
+{
+  "schema_id": "ndv-p1-s2-extraction-environment-v1",
+  "purpose": "Freeze the minimal software environment used only to read the pinned SWE-rebench Parquet and extract preregistered rows.",
+  "python": {
+    "required_major": 3,
+    "required_minor": 13
+  },
+  "pyarrow": {
+    "required_version": "25.0.1",
+    "role": "LOCAL_PARQUET_READER_ONLY"
+  },
+  "network_during_extraction": "FORBIDDEN",
+  "model_execution": "NONE",
+  "docker_execution": false,
+  "treatment_execution": "NOT_EXECUTED",
+  "holdout_access": "NONE",
+  "authority": "ENVIRONMENT_REPRODUCIBILITY_ONLY"
+}
