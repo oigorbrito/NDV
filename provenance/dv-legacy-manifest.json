@@ -1,0 +1,30 @@
+{
+  "schema_id": "ndv-dv-legacy-manifest-v1",
+  "legacy_repository": "oigorbrito/dv",
+  "legacy_default_branch": "main",
+  "legacy_cutover_commit": "66f3a218fba800daed5d86fdfce386491b8ab0e8",
+  "cutover_date": "2026-09-15",
+  "successor_repository": "oigorbrito/NDV",
+  "legacy_status": "HISTORICAL_RESEARCH_SOURCE",
+  "successor_status": "PROSPECTIVE_CANONICAL_RESEARCH_REPOSITORY",
+  "historical_artifact_policy": "REFERENCE_NOT_REWRITE",
+  "full_git_history_import": false,
+  "legacy_artifact_copy_policy": "COPY_ONLY_WHEN_TECHNICALLY_NECESSARY_AND_RETAIN_SOURCE_PROVENANCE",
+  "preserved_contract_paths": [
+    "experiments/p1/task-admissibility-contract-v1.json",
+    "experiments/p1/executor-screening-contract-v1.json",
+    "experiments/p1/run-accounting-contract-v1.json",
+    "experiments/p1/failure-attribution-v1.json",
+    "experiments/p1/statistical-analysis-plan-v1.json",
+    "experiments/p1/p1-holdout-policy-v1.json",
+    "experiments/p1/architecture-decision-gate-v1.json",
+    "experiments/p1/run-spec-v1.template.json",
+    "experiments/p1/run-result-v1.schema.json"
+  ],
+  "rules": [
+    "Historical DV artifacts retain their original names, hashes, repository paths, and meaning.",
+    "Prospective work created after cutover uses NDV naming and this repository.",
+    "A copied legacy artifact must retain an explicit source repository, source commit, source path, and integrity reference.",
+    "Historical pilot runs must never be relabeled as NDV runs."
+  ]
+}
