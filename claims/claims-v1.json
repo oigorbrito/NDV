@@ -1,0 +1,88 @@
+{
+  "schema_id": "ndv-claims-v1",
+  "project": "NDV",
+  "default_status": "UNTESTED",
+  "claims": [
+    {
+      "claim_id": "C-R1",
+      "statement": "Task heterogeneity creates exploitable routing headroom.",
+      "status": "UNTESTED",
+      "evidence_level": "E0",
+      "phase": "P1",
+      "architecture_implication": "routing capability",
+      "retest_triggers": ["NEW_FRONTIER_EXECUTOR", "PRICE_SHIFT", "TASK_DISTRIBUTION_SHIFT"]
+    },
+    {
+      "claim_id": "C-E1",
+      "statement": "Cheap-first execution with verification or escalation can improve economics relative to fixed strong execution.",
+      "status": "UNTESTED",
+      "evidence_level": "E0",
+      "phase": "P1",
+      "architecture_implication": "escalation policy",
+      "retest_triggers": ["NEW_FRONTIER_EXECUTOR", "PRICE_SHIFT"]
+    },
+    {
+      "claim_id": "C-H1",
+      "statement": "Structured task state can reduce recovery cost relative to workspace-only or generic history transfer.",
+      "status": "UNTESTED",
+      "evidence_level": "E0",
+      "phase": "P2",
+      "architecture_implication": "task-state capability",
+      "retest_triggers": ["MAJOR_HARNESS_CHANGE", "NEW_PRIOR_ART"]
+    },
+    {
+      "claim_id": "C-H2",
+      "statement": "Full execution trajectory is not necessarily the optimal handoff representation.",
+      "status": "UNTESTED",
+      "evidence_level": "E0",
+      "phase": "P2",
+      "architecture_implication": "handoff representation policy",
+      "retest_triggers": ["NEW_PRIOR_ART", "TASK_DISTRIBUTION_SHIFT"]
+    },
+    {
+      "claim_id": "C-C1",
+      "statement": "Different task profiles benefit from different execution compositions.",
+      "status": "UNTESTED",
+      "evidence_level": "E0",
+      "phase": "P3",
+      "architecture_implication": "composition selection",
+      "retest_triggers": ["NEW_FRONTIER_EXECUTOR", "TASK_DISTRIBUTION_SHIFT"]
+    },
+    {
+      "claim_id": "C-V1",
+      "statement": "Independent verification yields enough net utility to justify its cost for some task classes.",
+      "status": "UNTESTED",
+      "evidence_level": "E0",
+      "phase": "P3",
+      "architecture_implication": "conditional verification",
+      "retest_triggers": ["VERIFIER_CHANGE", "TASK_DISTRIBUTION_SHIFT"]
+    },
+    {
+      "claim_id": "C-A1",
+      "statement": "Sequential state-aware control can outperform fixed policies after controller overhead.",
+      "status": "UNTESTED",
+      "evidence_level": "E0",
+      "phase": "P4",
+      "architecture_implication": "adaptive controller",
+      "retest_triggers": ["NEW_FRONTIER_EXECUTOR", "MAJOR_HARNESS_CHANGE", "NEW_PRIOR_ART"]
+    },
+    {
+      "claim_id": "C-I1",
+      "statement": "An integrated NDV can improve the verified-success, total-cost, and latency Pareto frontier after all overhead.",
+      "status": "UNTESTED",
+      "evidence_level": "E0",
+      "phase": "P5",
+      "architecture_implication": "integrated NDV",
+      "retest_triggers": ["NEW_FRONTIER_EXECUTOR", "PRICE_SHIFT", "TASK_DISTRIBUTION_SHIFT", "NEW_PRIOR_ART"]
+    },
+    {
+      "claim_id": "C-X1",
+      "statement": "Existing ecosystem components can supply NDV-required capabilities more economically than custom implementation.",
+      "status": "UNTESTED",
+      "evidence_level": "E0",
+      "phase": "ALL",
+      "architecture_implication": "reuse-first engineering",
+      "retest_triggers": ["NEW_PRIOR_ART", "MAJOR_HARNESS_CHANGE"]
+    }
+  ]
+}
