@@ -2,141 +2,114 @@
 
 ## Purpose
 
-Validate the first real executor pipeline after the deterministic harness gate passed.
+Validate the real-executor evidence pipeline after WP-03 deterministic harness qualification. WP-04 is **pipeline qualification only**: it does not compare executors, establish routing headroom, demonstrate economic superiority, or justify NDV architecture.
 
-WP-04 is **pipeline qualification only**. It does not compare executors, estimate routing headroom, establish economic superiority, or justify NDV architecture.
+Historical authority remains `oigorbrito/dv@66f3a218fba800daed5d86fdfce386491b8ab0e8`. The cutover development corpus remains four admitted tasks across three families and three repositories with `comparative_corpus_ready=NO`.
 
-## Authority and prerequisites
+## Concrete frozen surface
 
-Historical authority remains `oigorbrito/dv` at cutover commit `66f3a218fba800daed5d86fdfce386491b8ab0e8`.
+The direct Ollama model endpoint is not treated as a software executor. Task exposure requires binding-v2: model plus a repository-capable scaffold proven on a synthetic mutation task.
 
-The normative historical development corpus at that cutover is `experiments/p1/p1-development-corpus-v6.json`, containing four admitted tasks across three families and three repositories. The historical artifact still states `comparative_corpus_ready = NO`.
+The qualified WP-04 surface used for Stage 1 is:
 
-WP-03 passed in GitHub Actions run `35100959680`. The uploaded deterministic smoke artifact has digest:
+- binding: `WP04-AIDER-OLLAMA-bcf636703b1a2973`;
+- scaffold: Aider `aider 0.86.2`;
+- model: `qwen2.5-coder:3b` through local Ollama;
+- retries: 0;
+- escalations: 0;
+- dynamic routing/fallback: forbidden.
 
-`sha256:e1081b2befbaad04454996bec2a0a40e655f0137eff54ae2b18b9758bf9d9e90`.
+`experiments/p1/wp04-executor-binding-v1.template.json` is historical/superseded for task exposure. Current task exposure requires `ndv-p1-wp04-executor-binding-v2`.
 
-Therefore the harness-mechanics blocker is closed.
+## Stage sequence
 
-The frozen WP-04 campaign contract and its validator were independently exercised by GitHub Actions run `35106775556`; the `validate` job completed successfully, including both static contract validation and `tools/test_ndv_validate_wp04_smoke.py`.
-
-## Provider-neutral design, concrete execution
-
-The campaign definition is provider-neutral. An execution is not.
-
-Before an admitted task can be exposed to an executor, exactly one concrete executor binding must be frozen using `experiments/p1/wp04-executor-binding-v1.template.json`.
-
-Allowed classes are:
-
-- `LOCAL_PINNED`
-- `HOSTED_FREE_PINNED`
-- `SUBSCRIPTION_EXECUTOR_PINNED`
-
-A binding must record exact executor identity, version/model hash, invocation surface, qualification evidence, telemetry mode, candidate capture mode, timeout and network policy.
-
-The following are forbidden:
-
-- random/free routers whose underlying model can change;
-- implicit fallback;
-- automatic model download during the run;
-- retries;
-- escalation to another executor;
-- dynamic routing.
-
-This preserves the causal unit of the smoke.
-
-## Staged task sequence
-
-WP-04 deliberately uses two historically admitted metaO tasks first:
+WP-04 uses two historically admitted metaO tasks only to qualify mechanics while reducing environment variance:
 
 1. `D-F5-01`
 2. `D-F6-01`
 
-This choice minimizes environment variation during pipeline qualification because both share the same repository and already have mature offline verifier evidence. It must not be interpreted as representative sampling.
+This is not representative sampling and creates no comparative authority.
 
-Stage 2 is gated on stage 1 producing a traceable result. A traceable result may be solved, failed, or inconclusive; the key requirement is that the pipeline can attribute what happened.
+### Stage 1 — D-F5-01
 
-For D-F5-01 the frozen historical oracle requires:
+The frozen task packet is `experiments/p1/wp04-stage1-d-f5-01-v1.json`, base `9cc5d6d722d509175a669624c9235156dffb4f85`.
+
+Stage 1 was executed once with raw task shaping and the frozen Aider+Qwen binding. The preserved result is `experiments/p1/wp04-stage1-result-r1.json`:
 
 ```text
-focal:
-python -m unittest tests.unit.test_operator_ux_doctor
-
-preservation:
-python -m unittest discover -s tests/unit
+outcome = SMOKE_VALID_FAILED
+failure_attribution = PRODUCT_FAILURE (frozen executor surface)
+executor_returncode = 0
+candidate_diff_bytes = 0
+baseline_structural_focal = FAIL as required
+candidate_structural_focal = FAIL
+baseline_preservation = PASS
+candidate_preservation = PASS
+retry_count = 0
+escalation_count = 0
+holdout_access = NONE
+reconciled_total_tokens ≈ 27,404
 ```
 
-The historical base revision is `9cc5d6d722d509175a669624c9235156dffb4f85`.
+Observed behavior: Aider reported that the model requested files be added to chat, exited successfully, and produced no repository diff. This is evidence about the **frozen Aider+Qwen surface**, not the model in isolation.
+
+Raw Stage-1 evidence is preserved under `pilot-runs/wp04-real-executor-smoke/stage1-d-f5-01-r1/`. Its historical `import-manifest.json` is v1 and remains unchanged.
+
+### Evidence-schema upgrade without rewriting history
+
+The current importer emits `ndv-wp04-import-manifest-v2`, with a byte-hashed inventory of `run-report.json` and immutable `evidence/` artifacts. Stage 2 and campaign closure require this evidence-only v2 contract.
+
+Because the already-preserved Stage-1 bundle predates v2, `tools/ndv_upgrade_wp04_import_manifest.py` creates a **non-destructive sidecar** `import-manifest-v2.json`. It independently revalidates the report/candidate evidence, recalculates artifact SHA-256/size and Aider token telemetry, and never modifies the historical v1 manifest or re-executes the treatment.
+
+Stage 2 and closure prefer this v2 sidecar when present.
+
+### Stage 2 — D-F6-01
+
+Stage 2 has **not** been executed. Its task contract and runner are frozen. Before any D-F6-01 exposure, `tools/ndv_run_wp04_stage2_df601.py` now requires:
+
+1. a hash-valid Stage-1 import manifest v2;
+2. the same binding ID used in Stage 1;
+3. the exact Aider executable path frozen in the binding;
+4. `aider --version` to exactly match the frozen Aider version;
+5. discriminating structural focal failure on the untouched historical base;
+6. all frozen Rust baseline oracle checks to pass;
+7. zero retry/escalation and sealed holdout.
+
+The Stage-1 artifact inventory shape is now aligned with the canonical v2 importer format: a list of `{path, size_bytes, sha256}` records. This fixes the prior inconsistency where the Stage-2 runner expected a dict/`bytes` shape that the official importer never emitted.
+
+## Import and campaign closure
+
+`tools/ndv_import_wp04_stage_run.py` imports only immutable evidence, never `workspace/` or verifier environments, and emits manifest v2 with token reconciliation.
+
+`tools/ndv_close_wp04_campaign.py` closes WP-04 only after **both** D-F5-01 and D-F6-01 have hash-valid v2 evidence bundles from the same binding. It re-hashes the preserved artifacts and rejects retry/escalation, holdout access, missing raw evidence provenance, treatment reexecution, or binding mismatch.
+
+Even a successful closure grants only `WP04_PIPELINE_SMOKE_COMPLETE`; comparative P1 release remains `NO`.
 
 ## Outcome vocabulary
 
-Only these WP-04 outcomes are valid:
+Valid stage outcomes are:
 
 - `SMOKE_VALID_SOLVED`
 - `SMOKE_VALID_FAILED`
 - `SMOKE_INCONCLUSIVE`
 
-A valid failure is useful evidence if candidate capture, verifier evidence, accounting and failure attribution all close correctly.
-
-An untraceable success is not sufficient.
-
-## Accounting and failure attribution
-
-The inherited accounting contract remains authoritative:
-
-`oigorbrito/dv@66f3a218...:experiments/p1/run-accounting-contract-v1.json`
-
-All consumed resources remain accounted on failure or inconclusive runs. `FREE != ZERO COST`. Local and free surfaces still retain hardware/runtime identity, wall-clock cost, setup information and missing telemetry explicitly.
-
-The inherited failure-attribution contract remains authoritative:
-
-`oigorbrito/dv@66f3a218...:experiments/p1/failure-attribution-v1.json`
-
-Only valid `PRODUCT_FAILURE` supports a treatment-level `NO`. Harness failure, oracle defect, environment drift, provider failure, resource limit and mandatory telemetry gaps must not be relabeled as product failure.
-
-## Governance validation
-
-Validate the static campaign contract:
-
-```bash
-python tools/ndv_validate_wp04_smoke.py
-```
-
-Validate a concrete executor binding before execution:
-
-```bash
-python tools/ndv_validate_wp04_smoke.py \
-  --binding path/to/frozen-executor-binding.json
-```
-
-The binding validator rejects unqualified surfaces, dynamic routing, fallbacks, downloads, retries and escalation.
-
-## Release gate
-
-WP-04 is not complete merely because an executor produced code.
-
-Completion requires:
-
-1. one concrete qualified binding frozen before task exposure;
-2. D-F5-01 executed with raw task shaping and no retry/escalation;
-3. candidate artifact captured;
-4. exact executor identity and raw execution evidence retained;
-5. independent focal/preservation verification;
-6. accounting reconciled, including explicit missingness;
-7. failure attribution recorded;
-8. D-F6-01 executed only after stage 1 is traceable;
-9. holdout remains sealed.
-
-Even after WP-04 passes, `P1_COMPARATIVE_READY` remains a separate gate requiring a sufficient corpus and multiple frozen treatment surfaces.
+A valid failure is useful if candidate capture, verifier evidence, accounting, and attribution close correctly. An untraceable success is not sufficient.
 
 ## Current status
 
 ```text
 WP-03 = PASS
 WP-04_CONTRACT = FROZEN
-WP-04_CONTRACT_VALIDATION = PASS (GitHub Actions run 35106775556)
-WP-04_EXECUTOR_BINDING = NOT_YET_FROZEN
-WP-04_EXECUTION = NOT_YET_EXECUTED
-NEXT_BLOCKER = QUALIFY_AND_FREEZE_ONE_CONCRETE_EXECUTOR_SURFACE
+WP-04_EXECUTOR_BINDING_V2 = FROZEN / QUALIFIED
+WP-04_STAGE1_D-F5-01 = EXECUTED
+WP-04_STAGE1_OUTCOME = SMOKE_VALID_FAILED
+WP-04_STAGE1_RAW_EVIDENCE = PRESERVED
+WP-04_STAGE1_IMPORT_V1 = HISTORICAL
+WP-04_STAGE1_IMPORT_V2_SIDECAR = TOOLING_READY / NOT_YET_PERSISTED
+WP-04_STAGE2_D-F6-01 = NOT_EXECUTED
+WP-04_CAMPAIGN_CLOSURE = NOT_COMPLETE
 COMPARATIVE_AUTHORITY = NONE
+ARCHITECTURE_AUTHORITY = NONE
 ```
+
+The next execution gate is: create/revalidate the Stage-1 v2 sidecar, then run D-F6-01 once with the exact frozen binding. No Stage-2 exposure is authorized if the sidecar/hash/binding/scaffold gates fail.
