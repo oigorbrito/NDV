@@ -1,19 +1,11 @@
 #!/usr/bin/env python3
-"""Qualify one already-installed Ollama model for NDV WP-04 binding.
-
-Fail-closed rules:
-- never downloads a model;
-- never selects a model implicitly;
-- requires exact installed model name and digest from a prior local-surface probe;
-- performs one synthetic non-P1 qualification request only;
-- records raw response, usage/timing when exposed, and candidate text;
-- emits a WP-04 binding only when identity and invocation evidence are complete.
-"""
+"""Qualify one already-installed Ollama model for NDV WP-04 binding."""
 from __future__ import annotations
 
 import argparse
 import hashlib
 import json
+import re
 import time
 import urllib.request
 from datetime import datetime, timezone
@@ -23,6 +15,10 @@ from typing import Any
 QUALIFICATION_PROMPT = (
     "Return only a unified diff for a hypothetical file named ndv_fixture.py. "
     "Change exactly `VALUE = 1` to `VALUE = 2`. Do not add prose."
+)
+EXPECTED_DIFF_RE = re.compile(
+    r"---\s+.*ndv_fixture\.py.*\n\+\+\+\s+.*ndv_fixture\.py.*\n.*-VALUE = 1.*\n.*\+VALUE = 2",
+    re.DOTALL,
 )
 
 
@@ -63,30 +59,52 @@ def post_json(url: str, payload: dict[str, Any], timeout: float) -> tuple[dict[s
     return decoded, raw, elapsed
 
 
-def make_binding(probe: dict[str, Any], model: dict[str, Any], qualification_ref: str, qualification_sha: str) -> dict[str, Any]:
+def candidate_is_valid(text: str) -> bool:
+    return bool(EXPECTED_DIFF_RE.search(text.replace("\r\n", "\n")))
+
+
+def make_binding(
+    probe: dict[str, Any],
+    model: dict[str, Any],
+    qualification_ref: str,
+    qualification_sha: str,
+    timeout_seconds: int,
+    frozen_at: str,
+) -> dict[str, Any]:
     cli = probe.get("ollama", {}).get("cli", {})
-    version = cli.get("stdout") if cli.get("returncode") == 0 else None
+    version = cli.get("stdout") if cli.get("returncode") == 0 else "UNMEASURED"
+    model_name = str(model.get("name"))
+    model_digest = str(model.get("digest"))
+    binding_seed = f"{model_name}|{model_digest}|{qualification_sha}".encode("utf-8")
+    binding_id = "WP04-LOCAL-OLLAMA-" + sha256_bytes(binding_seed)[:16]
     return {
-        "schema_id": "ndv-wp04-executor-binding-v1",
-        "binding_status": "QUALIFIED",
-        "binding_class": "LOCAL_PINNED",
-        "provider": "Ollama local runtime",
-        "executor_identity": model.get("name"),
-        "executor_version_or_model_hash": model.get("digest"),
-        "runtime_version": version,
-        "invocation_surface": "http://127.0.0.1:11434/api/generate",
+        "schema_id": "ndv-p1-wp04-executor-binding-v1",
+        "binding_id": binding_id,
+        "campaign_ref": "experiments/p1/wp04-real-executor-smoke-v1.json",
+        "surface_class": "LOCAL_PINNED",
+        "provider_or_runtime": f"Ollama local runtime ({version})",
+        "exact_executor_identity": model_name,
+        "version_or_model_hash": model_digest,
+        "invocation_command_or_surface": "http://127.0.0.1:11434/api/generate",
         "qualification_evidence_ref": qualification_ref,
         "qualification_evidence_sha256": qualification_sha,
-        "telemetry_mode": "OLLAMA_NATIVE_RESPONSE_FIELDS_OR_EXPLICIT_MISSINGNESS",
+        "telemetry_mode": {
+            "identity": "MODEL_NAME_PLUS_INSTALLED_DIGEST",
+            "usage": "OLLAMA_NATIVE_RESPONSE_FIELDS_OR_EXPLICIT_MISSINGNESS",
+            "timestamps": "NDV_WALL_CLOCK_PLUS_PROVIDER_FIELDS_WHEN_EXPOSED",
+            "raw_response_or_local_trace": "RAW_RESPONSE_PERSISTED_AND_HASHED",
+        },
         "candidate_capture_mode": "RAW_RESPONSE_AND_EXTRACTED_TEXT",
+        "timeout_seconds": timeout_seconds,
         "network_policy": "LOCAL_LOOPBACK_ONLY",
-        "automatic_download": False,
-        "dynamic_routing": False,
-        "implicit_fallback": False,
         "retry_limit": 0,
         "escalation_limit": 0,
-        "task_shaping": "S0_RAW_TASK",
-        "holdout_access": "FORBIDDEN",
+        "automatic_download": False,
+        "implicit_fallback": False,
+        "dynamic_routing": False,
+        "pricing_or_local_cost_ref": "LOCAL_COST_EVIDENCE_REQUIRED_AT_WP04_RUN_ACCOUNTING",
+        "frozen_at": frozen_at,
+        "status": "QUALIFIED",
     }
 
 
@@ -96,26 +114,28 @@ def main() -> int:
     ap.add_argument("--model", required=True)
     ap.add_argument("--out", required=True, type=Path)
     ap.add_argument("--binding-out", required=True, type=Path)
-    ap.add_argument("--timeout", type=float, default=120.0)
+    ap.add_argument("--timeout", type=int, default=120)
     args = ap.parse_args()
 
     probe = load(args.probe)
     model = find_model(probe, args.model)
-
     payload = {
         "model": args.model,
         "prompt": QUALIFICATION_PROMPT,
         "stream": False,
         "options": {"temperature": 0},
     }
+    frozen_at = datetime.now(timezone.utc).isoformat()
     try:
-        response, raw, elapsed = post_json("http://127.0.0.1:11434/api/generate", payload, args.timeout)
+        response, raw, elapsed = post_json("http://127.0.0.1:11434/api/generate", payload, float(args.timeout))
         candidate = response.get("response")
         if not isinstance(candidate, str) or not candidate.strip():
             raise ValueError("empty candidate text")
         observed_model = response.get("model")
         if observed_model not in (None, args.model):
             raise ValueError(f"runtime reported unexpected model identity: {observed_model!r}")
+        if not candidate_is_valid(candidate):
+            raise ValueError("synthetic coding qualification output did not satisfy the frozen diff oracle")
         status = "S0_READY"
         error = None
     except Exception as exc:
@@ -125,7 +145,7 @@ def main() -> int:
 
     evidence = {
         "schema_id": "ndv-local-ollama-qualification-v1",
-        "timestamp_utc": datetime.now(timezone.utc).isoformat(),
+        "timestamp_utc": frozen_at,
         "probe_ref": str(args.probe),
         "model_name": args.model,
         "model_digest": model.get("digest"),
@@ -139,6 +159,7 @@ def main() -> int:
         "raw_response_sha256": sha256_bytes(raw),
         "response": response,
         "candidate_text": candidate,
+        "candidate_oracle": "PASS" if isinstance(candidate, str) and candidate_is_valid(candidate) else "FAIL",
         "downloads_performed": False,
         "credentials_used": False,
         "p1_task_exposed": False,
@@ -150,7 +171,7 @@ def main() -> int:
     evidence_sha = sha256_bytes(encoded.encode("utf-8"))
 
     if status == "S0_READY":
-        binding = make_binding(probe, model, str(args.out), evidence_sha)
+        binding = make_binding(probe, model, str(args.out), evidence_sha, args.timeout, frozen_at)
         args.binding_out.parent.mkdir(parents=True, exist_ok=True)
         args.binding_out.write_text(json.dumps(binding, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         print(json.dumps({"status": status, "binding": str(args.binding_out), "evidence": str(args.out)}, indent=2))
