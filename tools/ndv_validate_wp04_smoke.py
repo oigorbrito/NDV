@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 ALLOWED_SURFACES = {"LOCAL_PINNED", "HOSTED_FREE_PINNED", "SUBSCRIPTION_EXECUTOR_PINNED"}
+ALLOWED_EXECUTOR_KINDS = {"STANDALONE_AGENT", "MODEL_PLUS_FROZEN_SCAFFOLD"}
 
 
 def load(path: Path) -> Any:
@@ -52,10 +53,13 @@ def validate_campaign(c: dict[str, Any]) -> list[str]:
 
 def validate_binding(b: dict[str, Any]) -> list[str]:
     errors: list[str] = []
-    if b.get("schema_id") != "ndv-p1-wp04-executor-binding-v1":
-        errors.append("unexpected binding schema_id")
+    if b.get("schema_id") != "ndv-p1-wp04-executor-binding-v2":
+        errors.append("execution requires binding schema ndv-p1-wp04-executor-binding-v2")
     if b.get("surface_class") not in ALLOWED_SURFACES:
         errors.append("binding.surface_class is not allowed")
+    if b.get("executor_kind") not in ALLOWED_EXECUTOR_KINDS:
+        errors.append("binding.executor_kind must identify a standalone agent or model+frozen scaffold")
+
     required = [
         "binding_id",
         "provider_or_runtime",
@@ -71,6 +75,29 @@ def validate_binding(b: dict[str, Any]) -> list[str]:
     for field in required:
         if b.get(field) in (None, "", "REQUIRED", "REQUIRED_UNIQUE", "REQUIRED_ISO8601"):
             errors.append(f"binding requires concrete {field}")
+
+    scaffold = b.get("scaffold")
+    if not isinstance(scaffold, dict):
+        errors.append("binding.scaffold must be an object")
+    else:
+        for field in ("name", "source_repository", "version_or_commit", "invocation_mode"):
+            if scaffold.get(field) in (None, "", "REQUIRED"):
+                errors.append(f"binding.scaffold requires {field}")
+        if scaffold.get("repository_tool_access") is not True:
+            errors.append("binding.scaffold.repository_tool_access must be true")
+        if scaffold.get("implicit_model_fallback") is not False:
+            errors.append("binding.scaffold.implicit_model_fallback must be false")
+        if scaffold.get("dynamic_routing") is not False:
+            errors.append("binding.scaffold.dynamic_routing must be false")
+
+    model = b.get("model")
+    if not isinstance(model, dict):
+        errors.append("binding.model must be an object")
+    else:
+        for field in ("identity", "digest_or_exact_version", "endpoint"):
+            if model.get(field) in (None, "", "REQUIRED"):
+                errors.append(f"binding.model requires {field}")
+
     timeout = b.get("timeout_seconds")
     if not isinstance(timeout, int) or timeout <= 0:
         errors.append("binding.timeout_seconds must be a positive integer")
@@ -81,6 +108,8 @@ def validate_binding(b: dict[str, Any]) -> list[str]:
     for field in ("automatic_download", "implicit_fallback", "dynamic_routing"):
         if b.get(field) is not False:
             errors.append(f"binding.{field} must be false")
+    if b.get("task_context_mode") != "RAW_TASK_PLUS_REPOSITORY_TOOL_ACCESS":
+        errors.append("binding.task_context_mode must be RAW_TASK_PLUS_REPOSITORY_TOOL_ACCESS")
     if b.get("status") != "QUALIFIED":
         errors.append("execution requires status=QUALIFIED")
 
