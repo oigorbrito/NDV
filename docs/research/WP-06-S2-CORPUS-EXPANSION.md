@@ -128,6 +128,33 @@ Base-mode rules:
 - record expected versus observed fail-to-pass/preservation behavior;
 - distinguish infrastructure/environment failures from oracle/task failures.
 
+### Pre-solution base runner
+
+`tools/ndv_run_s2_base_audit.py` performs the environment/base execution step. It consumes one quarantined `admission-only.json` plus the frozen Wave 01 candidate identity. It validates `instance_id`, repository and base commit before invoking Docker.
+
+Example:
+
+```bash
+python tools/ndv_run_s2_base_audit.py \
+  --candidate-id S2W01-elastic__synthetics-316 \
+  --admission-row .ndv-corpus/s2-w01/quarantine/S2W01-elastic__synthetics-316/admission-only.json \
+  --out .ndv-corpus/s2-w01/audit/S2W01-elastic__synthetics-316
+```
+
+The runner:
+
+1. requires the referenced image to resolve locally to a `RepoDigest` containing `@sha256:`;
+2. records that immutable digest as environment identity;
+3. derives the repository workdir only from the frozen candidate repository;
+4. derives commands only from `install_config.test_cmd`;
+5. runs with Docker network disabled;
+6. resets the repository to image `HEAD` and runs the frozen tests;
+7. never invokes `git apply`, never writes `patch.diff`, and never applies `patch` or `test_patch`;
+8. records stdout/stderr, hashes, duration, exit code, timeout state, image digest, parser name and command hash;
+9. treats a nonzero test exit as evidence to interpret later, not automatically as infrastructure failure.
+
+If the image cannot be resolved to an immutable local digest, the output is `ENVIRONMENT_BLOCKED`, not a task failure. The runner itself does not decide oracle validity or `AUDIT_PASS`; those remain separate audit decisions.
+
 A candidate may reach `AUDIT_PASS` only when the audit state contains an immutable image digest, hashed base-run evidence, focal verifier reference, preservation evidence, verifier provenance, environment evidence, independent-verifier determination, and matching expected base behavior.
 
 Validate audit-state governance with:
@@ -160,7 +187,8 @@ Boundary behavior has synthetic unit tests in:
 - `tools/test_ndv_quarantine_swe_rebench_rows.py`,
 - `tools/test_ndv_extract_pinned_swe_rebench_rows.py`,
 - `tools/test_ndv_validate_corpus_intake.py`,
-- `tools/test_ndv_validate_s2_audit.py`.
+- `tools/test_ndv_validate_s2_audit.py`,
+- `tools/test_ndv_run_s2_base_audit.py`.
 
 ## Task profiling
 
@@ -173,8 +201,9 @@ The current gates for Wave 01 are sequential:
 1. `LOCAL_PARQUET_SHA_PASS`,
 2. `FULL_PINNED_ROW_EXTRACTION`,
 3. `QUARANTINE_PASS`,
-4. `VERIFIER_ENVIRONMENT_AUDIT_PASS`,
-5. candidate-specific admission decision.
+4. `BASE_ENVIRONMENT_RUN_RECORDED`,
+5. `VERIFIER_ENVIRONMENT_AUDIT_PASS`,
+6. candidate-specific admission decision.
 
 No candidate in Wave 01 is currently admitted. No treatment execution is authorized on these candidates.
 
