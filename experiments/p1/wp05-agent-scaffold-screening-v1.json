@@ -1,0 +1,44 @@
+{
+  "schema_id": "ndv-p1-wp05-agent-scaffold-screening-v1",
+  "created_at": "2026-09-16",
+  "purpose": "Identify a repository-capable execution scaffold that can pair with the already-qualified local Ollama model endpoint for WP-04 without changing the model or adding routing.",
+  "observed_local_model_endpoint": {
+    "model": "qwen2.5-coder:3b",
+    "digest": "f72c60cabf6237b07f6e632b2c48d533cef25eda2efbd34bed21c5e9c01e6225",
+    "quantization": "Q4_K_M",
+    "classification": "MODEL_ENDPOINT_QUALIFIED_NOT_EXECUTOR",
+    "task_exposure": "NONE"
+  },
+  "candidates": [
+    {
+      "candidate_id": "SCAFFOLD-AIDER-LOCAL",
+      "project": "Aider-AI/aider",
+      "pinned_commit": "5dc9490bb35f9729ef2c95d00a19ccd30c26339c",
+      "platform_fit": "WINDOWS_DOCUMENTED",
+      "ollama_support": "DOCUMENTED",
+      "repository_editing": true,
+      "role": "MODEL_PLUS_FROZEN_SCAFFOLD",
+      "status": "SELECTED_FOR_LOCAL_QUALIFICATION",
+      "reason": "Windows installation and direct Ollama integration are documented; scaffold can inspect/edit a git repository without NDV selecting solution files."
+    },
+    {
+      "candidate_id": "SCAFFOLD-MINI-SWE-LOCAL",
+      "project": "SWE-agent/mini-swe-agent",
+      "pinned_commit": "04d809ceab9df28f9adaed044884180159172930",
+      "platform_fit": "WINDOWS_NATIVE_UNCERTAIN",
+      "ollama_or_local_model_support": "DOCUMENTED_VIA_LITELLM",
+      "repository_editing": true,
+      "role": "MODEL_PLUS_FROZEN_SCAFFOLD",
+      "status": "DEFERRED_FOR_WP04_WINDOWS_SMOKE",
+      "reason": "LocalEnvironment describes bash command execution while using the host shell; on native Windows this introduces avoidable shell-compatibility uncertainty for the first smoke."
+    }
+  ],
+  "selection_scope": "PIPELINE_COMPATIBILITY_ONLY_NOT_MODEL_QUALITY",
+  "prohibitions": [
+    "Do not compare scaffold quality on P1 tasks during qualification.",
+    "Do not expose D-F5-01 until a binding-v2 passes the WP-04 validator.",
+    "Do not change the local model during scaffold qualification.",
+    "Do not enable model fallback or dynamic routing."
+  ],
+  "next_gate": "AIDER_INSTALLATION_IDENTITY_AND_SYNTHETIC_REPOSITORY_EDIT_QUALIFICATION"
+}
