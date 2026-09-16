@@ -1,0 +1,54 @@
+{
+  "campaign_id": "NDV-P1-S1A-DETERMINISTIC-HARNESS-SMOKE-V1",
+  "purpose": "Validate inherited DV harness mechanics before any NDV LLM treatment execution.",
+  "claim_authority": "PIPELINE_MECHANICS_ONLY",
+  "legacy_harness": {
+    "repository": "oigorbrito/dv",
+    "commit": "66f3a218fba800daed5d86fdfce386491b8ab0e8",
+    "path": "tools/dv_pilot_harness.py",
+    "blob_sha": "0f7f936e46dbaccf243b6b77dd6014eedeb076cf",
+    "policy": "REFERENCE_AND_REUSE_WITHOUT_SEMANTIC_REWRITE"
+  },
+  "cases": [
+    {
+      "id": "H0_NOOP",
+      "executor_behavior": "no workspace change; emit deterministic zero-cost fixture telemetry",
+      "verifier_expectation": "NO",
+      "expected_failure_attribution": "PRODUCT_FAILURE"
+    },
+    {
+      "id": "H1_KNOWN_VALID",
+      "executor_behavior": "write the exact expected marker artifact; emit deterministic zero-cost fixture telemetry",
+      "verifier_expectation": "YES",
+      "expected_failure_attribution": null
+    },
+    {
+      "id": "H2_KNOWN_INVALID",
+      "executor_behavior": "write a deterministic invalid marker artifact; emit deterministic zero-cost fixture telemetry",
+      "verifier_expectation": "NO",
+      "expected_failure_attribution": "PRODUCT_FAILURE"
+    }
+  ],
+  "required_assertions": [
+    "all three harness invocations complete without harness reconciliation failure",
+    "H0 is classified as conclusive NO",
+    "H1 is classified as conclusive YES",
+    "H2 is classified as conclusive NO",
+    "all conclusive outcomes contain evidence_refs",
+    "telemetry is explicit and reconciled rather than inferred",
+    "artifact hashes are produced by the inherited harness",
+    "no LLM, provider credential, network model call, or holdout task is used"
+  ],
+  "gate": {
+    "pass": "all required assertions hold",
+    "fail": "any expected classification, evidence, telemetry, or reconciliation assertion fails",
+    "on_fail": "STOP_BEFORE_REAL_EXECUTOR_SMOKE"
+  },
+  "forbidden_claims": [
+    "executor quality",
+    "routing quality",
+    "economic superiority",
+    "task solve rate",
+    "NDV architecture validation"
+  ]
+}
