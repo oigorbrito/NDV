@@ -2,68 +2,81 @@
 
 ## Scope
 
-This block closes the prospective S2 admission path after source acquisition, quarantine, base execution and oracle interpretation. It does not execute any treatment or model.
+This gate closes the prospective S2 admission path after pinned source acquisition, quarantine, pre-solution base audit, and oracle interpretation. It performs no treatment/model execution.
 
-## Verifier evidence
+The active audit contract is `experiments/p1/s2-verifier-environment-audit-v2.json`. Version 1 remains historical and is superseded before any Wave-01 empirical audit result was produced.
 
-`tools/ndv_build_s2_verifier_evidence.py` consumes only admission-side metadata and frozen parser provenance. It produces four immutable artifacts:
+## Source and verifier binding
 
-- `focal-verifier.json` from `FAIL_TO_PASS`,
-- `preservation-verifier.json` from `PASS_TO_PASS`,
-- `verifier-provenance.json`,
-- `bundle.json` binding the artifact hashes.
+Admission-side artifacts remain bound to the original pinned source row, not merely to instance text. The chain carries:
 
-The builder deliberately does not copy `patch` or `test_patch` into any output. Parser identity must match the task's frozen `install_config.log_parser`.
+- dataset revision,
+- original `source_row_index`,
+- source instance ID,
+- canonical full-row SHA-256,
+- task-statement SHA-256,
+- executor-visible projection SHA-256.
 
-## Audit gate
+`tools/ndv_build_s2_verifier_evidence.py` consumes the quarantined `admission-only.json`, revalidates the full-row hash, and emits v2 focal, preservation, provenance, and bundle artifacts. `patch` and `test_patch` content are not copied to verifier evidence.
 
-`tools/ndv_validate_s2_audit.py` requires an `AUDIT_PASS` record to contain authenticated evidence for:
+## Base-audit integrity
 
+An `AUDIT_PASS` cannot rely on a test exit code alone. The v2 base audit must independently prove:
+
+- exact repository `HEAD == base_revision`,
+- clean worktree before tests,
+- immutable image RepoDigest,
+- network disabled,
+- no gold patch or test patch applied,
+- return-code evidence for every frozen test command.
+
+The resulting audit record must carry `harness_integrity=PASS`. A later successful command cannot hide an earlier failure.
+
+## Oracle and preservation gate
+
+`tools/ndv_interpret_s2_base_oracle.py` only interprets a v2, harness-valid base run. `AUDIT_PASS` requires:
+
+- `oracle_classification=EXPECTED_BASE_BEHAVIOR`,
+- `base_behavior_matches_expected=true`,
+- `preservation_baseline_pass=true`,
+- `verifier_independent=true`,
+- all evidence refs and SHA-256 values,
 - immutable image digest,
-- base run,
-- oracle interpretation,
-- focal verifier,
-- preservation verifier,
-- verifier provenance,
-- environment evidence.
+- `treatment_execution=NOT_EXECUTED`,
+- both patch-application flags false.
 
-The corresponding SHA-256 values for base, oracle, focal, preservation and provenance are mandatory. `oracle_classification` must be `EXPECTED_BASE_BEHAVIOR`, verifier independence must be true, base behavior must match expectation, and preservation baseline must pass.
+Missing expected pre-solution tests remain `ORACLE_MISMATCH`; they are not repaired from `test_patch` or gold-solution knowledge.
 
-## Deterministic admission decision
+## Direct-call fail-closed rule
 
-`tools/ndv_decide_s2_admission.py` joins the frozen discovery wave with audit state and emits one of:
+Safety does not depend on running tools in the expected order.
 
-- `ADMIT`, or
-- `DO_NOT_ADMIT` plus explicit blockers.
+`tools/ndv_validate_s2_audit.py`, `tools/ndv_decide_s2_admission.py`, and `tools/ndv_freeze_s2_admission.py` each independently recheck the critical gates. A forged `AUDIT_PASS` label, missing hash, harness failure, patch contamination, treatment contamination, invalid image digest, unresolved family, or missing source binding blocks admission even if an earlier validator was skipped.
 
-A candidate is blocked if quarantine is incomplete, audit is not `AUDIT_PASS`, base oracle is not expected, verifier independence is unresolved, preservation fails, treatment execution contaminated admission, family is unassigned, or solution isolation is not proven.
-
-This tool does not mutate the discovery wave.
+The admission decision schema is `ndv-p1-s2-admission-decisions-v2` and emits `ADMIT` only when no blocker remains.
 
 ## Immutable admission record
 
-`tools/ndv_freeze_s2_admission.py` freezes a candidate only from an unblocked `ADMIT` decision. It creates an `ndv-p1-s2-admission-record-v1` artifact binding task identity, executor-visible task hash, quarantine evidence and all audit evidence.
+`tools/ndv_freeze_s2_admission.py` creates `ndv-p1-s2-admission-record-v2` only from an unblocked decision and revalidates the same gates itself.
 
-The original discovery record remains historical. Admission is represented by a new immutable artifact rather than rewriting how the candidate was originally discovered.
+The frozen record binds the original row index and raw-row SHA to task identity, quarantine artifacts, executor-visible projection, image digest, harness integrity, oracle evidence, focal/preservation evidence, verifier provenance, and environment evidence. Discovery history is not rewritten.
 
-## Treatment firewall
+Until such a record exists with `status=ADMITTED_FROZEN`, treatment execution remains forbidden for that candidate.
 
-Until an admission record exists with `status=ADMITTED_FROZEN`, treatment execution remains forbidden for that candidate. Admission decisions must not consult model/treatment performance.
+## Current state
 
-## Block outcome
-
-At implementation level, the complete S2 intake path is now:
+The complete path is:
 
 ```text
-pinned source
-→ full-row extraction
+pinned parquet identity
+→ indexed full-row extraction
 → quarantine
-→ base environment run
-→ oracle interpretation
-→ focal/preservation evidence
+→ harness-valid pre-solution base run
+→ frozen oracle interpretation
+→ focal/preservation/provenance evidence
 → audit validation
 → deterministic admission decision
-→ immutable admission record
+→ source-bound ADMITTED_FROZEN record
 ```
 
-The six Wave-01 candidates remain unadmitted until the local evidence-producing stages are actually executed. The presence of tooling is not evidence that any candidate passed.
+All six Wave-01 candidates remain `SCREENING` / `WAITING_QUARANTINE`. No local pinned-Parquet verification, candidate Docker base audit, admission, holdout access, or treatment execution has been recorded for them. Tooling readiness is not empirical admission evidence.
