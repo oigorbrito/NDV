@@ -38,65 +38,46 @@ Every instance must pass, in order:
 
 1. discovery and source metadata freeze,
 2. exact pre-solution base identification,
-3. source parquet identity freeze,
-4. local SHA-256 verification of the parquet resolved at the pinned dataset revision,
-5. full selected-row extraction,
-6. admission-only / executor-visible quarantine split,
-7. task-statement freeze and hash,
-8. focal verifier identification,
-9. verifier provenance and independence proof,
-10. reproducible environment materialization,
-11. base verifier execution,
-12. preservation/regression baseline execution,
-13. environment classification,
-14. solution-isolation check,
-15. exactly-one-family assignment,
-16. explicit admission or rejection.
+3. full row acquisition from the pinned dataset revision,
+4. admission-only / executor-visible quarantine split,
+5. task-statement freeze and hash,
+6. focal verifier identification,
+7. verifier provenance and independence proof,
+8. reproducible environment materialization,
+9. base verifier execution,
+10. preservation/regression baseline execution,
+11. environment classification,
+12. solution-isolation check,
+13. exactly-one-family assignment,
+14. explicit admission or rejection.
 
 ## Selection firewall
 
 Treatment/model performance must not influence candidate selection. No admitted or prospective candidate should be run through Luna, a local model, a hosted-free model, or a strong executor until its admission disposition is frozen.
 
-## Source snapshot and revision binding
+## Full-row quarantine
 
-`experiments/p1/s2-source-snapshot-01.json` freezes the source identity used by Wave 01:
+SWE-rebench V2 contains both executor-appropriate task text and fields that can leak gold-solution or grader information. Dataset preview snippets are discovery aids only and are insufficient for row integrity because they may be truncated.
 
-- dataset: `nebius/SWE-rebench-V2`,
-- split: `train`,
-- revision: `475dd5e8703bb5fb22dd3c60b5d038b019eba1e0`,
-- parquet: `data/train-00000-of-00001.parquet`,
-- frozen parquet SHA-256: `0e0bf9355f892ad74ae98d4e1c404f39fd6654a8e351ee3e6ab162e4a64cd3ad`,
-- expected row count: 32079.
-
-The Hugging Face Dataset Viewer `/rows` API is useful for discovery and inspection but is not accepted as proof of pinned-row integrity because the API does not take a dataset revision parameter. Therefore, admission requires extracting rows from a parquet resolved at the pinned revision and verifying its SHA-256 locally before extraction.
-
-## Strong acquisition path
-
-Obtain the parquet from the exact pinned dataset revision, then run:
+An operator must acquire the source Parquet from the exact pinned dataset revision and verify it against `experiments/p1/s2-source-snapshot-01.json`. Then run:
 
 ```bash
 python tools/ndv_extract_pinned_swe_rebench_rows.py \
   --parquet path/to/train-00000-of-00001.parquet \
-  --snapshot experiments/p1/s2-source-snapshot-01.json \
   --wave experiments/p1/s2-candidate-wave-01.json \
-  --out .ndv-corpus/s2-w01/full-rows.jsonl \
-  --quarantine-out .ndv-corpus/s2-w01/quarantine
+  --snapshot experiments/p1/s2-source-snapshot-01.json \
+  --out .ndv-corpus/s2-w01/pinned-rows.jsonl
 ```
 
-The extractor performs four gates before quarantine:
+The extractor refuses to proceed if the Parquet SHA-256, candidate instance identity, or base commit does not match the frozen source/wave metadata.
 
-1. recompute the complete parquet SHA-256 and require equality with the frozen source snapshot,
-2. require the wave and source snapshot to reference the same dataset revision,
-3. extract only the preregistered source row indices,
-4. require every extracted row's `instance_id` and `base_commit` to match the frozen candidate record.
+Then run:
 
-A SHA mismatch, row-index mismatch, instance mismatch, or base-commit mismatch is a hard failure. The tool does not execute any model or treatment.
-
-`pyarrow` is required only for the local parquet extraction step; it is not part of NDV runtime architecture.
-
-## Full-row quarantine
-
-SWE-rebench V2 contains both executor-appropriate task text and fields that can leak gold-solution or grader information. Dataset preview snippets are discovery aids only and are insufficient for row integrity because they may be truncated.
+```bash
+python tools/ndv_quarantine_swe_rebench_rows.py \
+  --rows .ndv-corpus/s2-w01/pinned-rows.jsonl \
+  --out .ndv-corpus/s2-w01/quarantine
+```
 
 The quarantine tool creates, per candidate:
 
@@ -125,35 +106,61 @@ Known gold/grader fields remain admission-only, including at least:
 - `install_config`,
 - `pr_description`.
 
-Critically, any future upstream field that NDV does not explicitly allow also remains admission-only by default. This prevents schema drift upstream from silently expanding executor context.
+Any future upstream field that NDV does not explicitly allow also remains admission-only by default. This prevents schema drift upstream from silently expanding executor context.
 
 The external discovery donor's record hash is retained as provenance but is not assumed to use the same canonicalization as NDV. NDV computes its own canonical full-row SHA-256, task-statement SHA-256, and executor-visible projection SHA-256.
 
 A candidate cannot become `ADMITTED` until the intake validator sees `quarantine_status=PASS` plus references and hashes for the quarantine artifacts.
 
-Admission tooling may inspect full grader/gold metadata only for oracle validity, provenance, environment setup, and leakage control. That material must never be copied into executor-visible artifacts unless a new field is separately preregistered and demonstrated to be non-leaking.
+## Verifier/environment audit
+
+After quarantine, each candidate enters `experiments/p1/s2-audit-state-01.json` under the rules in `experiments/p1/s2-verifier-environment-audit-v1.json`.
+
+The upstream SWE-rebench V2 `scripts/eval.py` is useful verifier prior art, but its normal evaluation path is not a base verifier: it applies the solution `patch` and the `test_patch` before executing the test commands. Therefore NDV must establish pre-solution base behavior independently.
+
+Base-mode rules:
+
+- never apply the gold solution patch;
+- freeze the image tag to an immutable resolved digest;
+- freeze `install_config.test_cmd` and the selected log-parser implementation from admission-only data;
+- preregister whether `test_patch` is necessary for focal verification and audit it for leakage before use;
+- execute the frozen tests against the frozen base state;
+- record expected versus observed fail-to-pass/preservation behavior;
+- distinguish infrastructure/environment failures from oracle/task failures.
+
+A candidate may reach `AUDIT_PASS` only when the audit state contains an immutable image digest, hashed base-run evidence, focal verifier reference, preservation evidence, verifier provenance, environment evidence, independent-verifier determination, and matching expected base behavior.
+
+Validate audit-state governance with:
+
+```bash
+python tools/ndv_validate_s2_audit.py experiments/p1/s2-audit-state-01.json
+```
+
+The audit packet itself does not execute treatments.
 
 ## First prospective wave
 
 `experiments/p1/s2-candidate-wave-01.json` freezes the first NDV-native discovery wave from SWE-rebench V2. It contains six candidates from six repositories and six languages (`ts`, `js`, `java`, `go`, `python`, `rust`).
 
-The wave deliberately starts at `SCREENING`, not `ADMITTED`. Source metadata was discovered from a separately published pinned smoke manifest; that manifest is a discovery donor, not admission authority. NDV must independently acquire the full rows through the pinned parquet path, resolve image digests, verifier independence, and base/preservation behavior.
+The wave deliberately starts at `SCREENING`, not `ADMITTED`. Source metadata was discovered from a separately published pinned smoke manifest; that manifest is a discovery donor, not admission authority. NDV must independently acquire the full rows from the pinned dataset revision, resolve source integrity, image digests, verifier independence, and base/preservation behavior.
 
 ## Validation
 
-Run the deterministic governance validator with:
+Run the deterministic governance validators with:
 
 ```bash
 python tools/ndv_validate_corpus_intake.py experiments/p1/s2-candidate-wave-01.json
+python tools/ndv_validate_s2_audit.py experiments/p1/s2-audit-state-01.json
 ```
 
-It checks pinned revision format, candidate/base/hash structure, quarantine coverage, disposition validity, diversity-summary consistency, holdout isolation, and stricter requirements for any future `ADMITTED` disposition. It does not execute models or tests.
+They check governance and evidence completeness only. They do not execute models.
 
-Synthetic tests cover both halves of the source-integrity boundary:
+Boundary behavior has synthetic unit tests in:
 
-- `tools/test_ndv_extract_pinned_swe_rebench_rows.py` — parquet SHA and row identity binding;
-- `tools/test_ndv_quarantine_swe_rebench_rows.py` — gold-field and unknown-field containment;
-- `tools/test_ndv_validate_corpus_intake.py` — admission cannot bypass quarantine.
+- `tools/test_ndv_quarantine_swe_rebench_rows.py`,
+- `tools/test_ndv_extract_pinned_swe_rebench_rows.py`,
+- `tools/test_ndv_validate_corpus_intake.py`,
+- `tools/test_ndv_validate_s2_audit.py`.
 
 ## Task profiling
 
@@ -161,9 +168,13 @@ After admission criteria are satisfied, record structural profile features such 
 
 ## Current gate
 
-The current gate for Wave 01 is:
+The current gates for Wave 01 are sequential:
 
-`PINNED_PARQUET_SHA_VERIFICATION_AND_ROW_EXTRACTION`
+1. `LOCAL_PARQUET_SHA_PASS`,
+2. `FULL_PINNED_ROW_EXTRACTION`,
+3. `QUARANTINE_PASS`,
+4. `VERIFIER_ENVIRONMENT_AUDIT_PASS`,
+5. candidate-specific admission decision.
 
 No candidate in Wave 01 is currently admitted. No treatment execution is authorized on these candidates.
 
@@ -173,4 +184,4 @@ Corpus acquisition may pause when the operational diversity target is met or whe
 
 ## Claims
 
-WP-06 can support claims about corpus admissibility, diversity, source integrity, quarantine, leakage controls, and reproducibility. It cannot support executor rankings, routing benefits, architecture superiority, or NDV product claims.
+WP-06 can support claims about corpus admissibility, diversity, source integrity, quarantine, leakage controls, verifier provenance, environment reproducibility, and base/preservation behavior. It cannot support executor rankings, routing benefits, architecture superiority, or NDV product claims.
