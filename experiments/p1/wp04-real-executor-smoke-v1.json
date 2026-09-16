@@ -1,0 +1,116 @@
+{
+  "schema_id": "ndv-p1-wp04-real-executor-smoke-v1",
+  "created_at": "2026-09-16",
+  "purpose": "Validate the real executor -> candidate -> verifier -> accounting pipeline after WP-03 PASS without making comparative executor or routing claims.",
+  "authority": {
+    "legacy_repository": "oigorbrito/dv",
+    "legacy_commit": "66f3a218fba800daed5d86fdfce386491b8ab0e8",
+    "historical_corpus": "experiments/p1/p1-development-corpus-v6.json",
+    "historical_run_spec_template": "experiments/p1/run-spec-v1.template.json",
+    "historical_accounting_contract": "experiments/p1/run-accounting-contract-v1.json",
+    "historical_failure_attribution": "experiments/p1/failure-attribution-v1.json",
+    "historical_harness": "tools/dv_pilot_harness.py"
+  },
+  "prerequisites": {
+    "wp03_result": "PASS",
+    "wp03_evidence": {
+      "workflow_run_id": 35100959680,
+      "artifact_name": "wp03-deterministic-harness-smoke",
+      "artifact_digest": "sha256:e1081b2befbaad04454996bec2a0a40e655f0137eff54ae2b18b9758bf9d9e90"
+    }
+  },
+  "scope": {
+    "classification": "PIPELINE_SMOKE_ONLY",
+    "executor_ranking": "FORBIDDEN",
+    "economic_superiority_claim": "FORBIDDEN",
+    "routing_claim": "FORBIDDEN",
+    "architecture_claim": "FORBIDDEN",
+    "holdout_access": "FORBIDDEN",
+    "retries": 0,
+    "escalations": 0,
+    "shaping": "S0_RAW_TASK"
+  },
+  "executor_binding_policy": {
+    "provider_neutral": true,
+    "rule": "The campaign is provider-neutral at design time, but every executed run MUST bind one concrete qualified executor surface before task exposure.",
+    "required_before_execution": [
+      "binding_id",
+      "surface_class",
+      "provider_or_runtime",
+      "exact_executor_identity",
+      "version_or_model_hash",
+      "invocation_command_or_surface",
+      "telemetry_mode",
+      "candidate_capture_mode",
+      "timeout_seconds",
+      "network_policy",
+      "qualification_evidence_ref"
+    ],
+    "allowed_surface_classes": [
+      "LOCAL_PINNED",
+      "HOSTED_FREE_PINNED",
+      "SUBSCRIPTION_EXECUTOR_PINNED"
+    ],
+    "dynamic_or_random_routing": "FORBIDDEN",
+    "automatic_download": "FORBIDDEN",
+    "implicit_fallback": "FORBIDDEN"
+  },
+  "task_sequence": [
+    {
+      "stage": 1,
+      "task_id": "D-F5-01",
+      "family": "F5",
+      "repository": "oigorbrito/metaO",
+      "base_sha": "9cc5d6d722d509175a669624c9235156dffb4f85",
+      "oracle_ref": "oigorbrito/dv@66f3a218fba800daed5d86fdfce386491b8ab0e8:pilot-runs/block-4ah-offline-oracle-closure/run-specs/D-F5-01-oracle.json",
+      "focal_command": ["python", "-m", "unittest", "tests.unit.test_operator_ux_doctor"],
+      "preservation_command": ["python", "-m", "unittest", "discover", "-s", "tests/unit"],
+      "gate_to_next": "TRACEABLE_CONCLUSIVE_RESULT"
+    },
+    {
+      "stage": 2,
+      "task_id": "D-F6-01",
+      "family": "F6",
+      "repository": "oigorbrito/metaO",
+      "base_sha": "5d00cd284ce8fe810b0f5192c56d98608be516d4",
+      "oracle_ref": "oigorbrito/dv@66f3a218fba800daed5d86fdfce386491b8ab0e8:pilot-runs/block-4ah-offline-oracle-closure/run-specs/D-F6-01-oracle.json",
+      "gate_to_next": "CAMPAIGN_COMPLETE"
+    }
+  ],
+  "selection_reason": "D-F5-01 then D-F6-01 are used only for pipeline validation because both are historically admitted, have mature offline verifier evidence, and share the metaO repository, reducing environment variance during smoke. This is not a representative or comparative task sample.",
+  "run_requirements": {
+    "candidate_workspace_isolated": true,
+    "candidate_artifact_required": true,
+    "verifier_independent_of_executor_self_report": true,
+    "all_consumed_resources_accounted_on_failure": true,
+    "missing_telemetry_never_zero": true,
+    "explicit_zero_allowed_only_when_measured": true,
+    "raw_executor_evidence_required": true,
+    "failure_attribution_required": true,
+    "no_silent_retry": true,
+    "no_silent_escalation": true
+  },
+  "outcomes": [
+    "SMOKE_VALID_SOLVED",
+    "SMOKE_VALID_FAILED",
+    "SMOKE_INCONCLUSIVE"
+  ],
+  "stop_rules": [
+    "If stage 1 lacks exact executor identity, candidate capture, verifier evidence, accounting closure, or attributable failure, STOP and do not run stage 2.",
+    "Any provider/runtime failure is evidence about the surface or environment, not PRODUCT_FAILURE unless the historical failure-attribution contract permits it.",
+    "Do not add a second executor to rescue the run; that would create an escalation treatment outside WP-04.",
+    "Do not compare this campaign against another executor or derive routing/economic claims from it."
+  ],
+  "release_gate": {
+    "wp04_complete_requires": [
+      "stage_1_traceable_conclusive_or_valid_inconclusive",
+      "stage_2_executed_only_if_stage_1_traceable",
+      "all_run_artifacts_persisted",
+      "accounting_reconciled",
+      "failure_attribution_recorded",
+      "no_holdout_access",
+      "no_retry_or_escalation"
+    ],
+    "comparative_release": "NO"
+  }
+}
