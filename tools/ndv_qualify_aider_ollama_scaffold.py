@@ -43,6 +43,31 @@ def find_model(probe: dict[str, Any], model_name: str) -> dict[str, Any]:
     return matches[0]
 
 
+def resolve_aider(explicit: Path | None) -> str:
+    if explicit is not None:
+        candidate = explicit.expanduser()
+        if not candidate.is_file():
+            raise ValueError(f"explicit aider executable does not exist: {candidate}")
+        return str(candidate.resolve())
+
+    from_path = shutil.which("aider")
+    if from_path:
+        return from_path
+
+    home = Path.home()
+    candidates = [
+        home / ".local" / "bin" / "aider.exe",
+        home / ".local" / "bin" / "aider",
+    ]
+    for candidate in candidates:
+        if candidate.is_file():
+            return str(candidate.resolve())
+
+    raise ValueError(
+        "aider executable not found; pass --aider-exe explicitly or install it before qualification"
+    )
+
+
 def run(argv: list[str], cwd: Path, timeout: int, env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         argv,
@@ -70,6 +95,7 @@ def diff_is_valid(diff: str) -> bool:
 def make_binding(
     *,
     aider_version: str,
+    aider_executable: str,
     model_name: str,
     model_digest: str,
     evidence_ref: str,
@@ -77,7 +103,7 @@ def make_binding(
     frozen_at: str,
     timeout_seconds: int,
 ) -> dict[str, Any]:
-    seed = f"aider|{aider_version}|{model_name}|{model_digest}|{evidence_sha}".encode("utf-8")
+    seed = f"aider|{aider_version}|{aider_executable}|{model_name}|{model_digest}|{evidence_sha}".encode("utf-8")
     return {
         "schema_id": "ndv-p1-wp04-executor-binding-v2",
         "binding_id": "WP04-AIDER-OLLAMA-" + sha256_bytes(seed)[:16],
@@ -91,6 +117,7 @@ def make_binding(
             "name": "aider",
             "source_repository": "Aider-AI/aider",
             "version_or_commit": aider_version,
+            "executable_path": aider_executable,
             "invocation_mode": "noninteractive --message repository edit",
             "repository_tool_access": True,
             "implicit_model_fallback": False,
@@ -101,7 +128,7 @@ def make_binding(
             "digest_or_exact_version": model_digest,
             "endpoint": "http://127.0.0.1:11434",
         },
-        "invocation_command_or_surface": f"aider --model ollama_chat/{model_name} --message <RAW_TASK>",
+        "invocation_command_or_surface": f"{aider_executable} --model ollama_chat/{model_name} --message <RAW_TASK>",
         "qualification_evidence_ref": evidence_ref,
         "qualification_evidence_sha256": evidence_sha,
         "telemetry_mode": {
@@ -131,14 +158,16 @@ def main() -> int:
     ap.add_argument("--model", required=True)
     ap.add_argument("--out", required=True, type=Path)
     ap.add_argument("--binding-out", required=True, type=Path)
+    ap.add_argument("--aider-exe", type=Path, help="Explicit Aider executable path; useful when uv's bin dir is not active in PATH")
     ap.add_argument("--timeout", type=int, default=300)
     args = ap.parse_args()
 
     probe = load(args.probe)
     model = find_model(probe, args.model)
-    aider = shutil.which("aider")
-    if not aider:
-        raise SystemExit("aider executable not found; install/freeze scaffold before qualification")
+    try:
+        aider = resolve_aider(args.aider_exe)
+    except ValueError as exc:
+        raise SystemExit(str(exc))
 
     now = datetime.now(timezone.utc).isoformat()
     with tempfile.TemporaryDirectory(prefix="ndv-aider-qual-") as tmp:
@@ -186,6 +215,7 @@ def main() -> int:
             "schema_id": "ndv-wp05-aider-ollama-scaffold-qualification-v1",
             "timestamp_utc": now,
             "aider_version": aider_version,
+            "aider_executable": aider,
             "model_name": args.model,
             "model_digest": model.get("digest"),
             "model_quantization": model.get("quantization_level"),
@@ -216,6 +246,7 @@ def main() -> int:
 
         binding = make_binding(
             aider_version=aider_version,
+            aider_executable=aider,
             model_name=args.model,
             model_digest=str(model.get("digest")),
             evidence_ref=str(args.out),
