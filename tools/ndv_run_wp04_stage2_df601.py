@@ -11,7 +11,6 @@ import argparse
 import hashlib
 import json
 import os
-import shutil
 import subprocess
 import sys
 import time
@@ -81,8 +80,27 @@ def materialize(source_repo: Path, workspace: Path, base_sha: str, evidence: Pat
     return origin
 
 
+def stage1_manifest_path(path: Path) -> Path:
+    sidecar = path / "import-manifest-v2.json"
+    return sidecar if sidecar.is_file() else path / "import-manifest.json"
+
+
+def artifact_index(records: Any) -> dict[str, dict[str, Any]]:
+    if not isinstance(records, list):
+        raise ValueError("Stage 1 preserved_artifacts must use canonical v2 list form")
+    out: dict[str, dict[str, Any]] = {}
+    for record in records:
+        if not isinstance(record, dict):
+            raise ValueError("invalid Stage 1 artifact inventory record")
+        rel = record.get("path")
+        if not isinstance(rel, str) or not rel or rel in out:
+            raise ValueError("invalid or duplicate Stage 1 artifact path")
+        out[rel] = record
+    return out
+
+
 def validate_stage1_import(path: Path, binding_id: str) -> dict[str, Any]:
-    manifest_path = path / "import-manifest.json"
+    manifest_path = stage1_manifest_path(path)
     report_path = path / "run-report.json"
     if not manifest_path.is_file() or not report_path.is_file():
         raise ValueError("Stage 1 import manifest and run-report are required")
@@ -98,16 +116,39 @@ def validate_stage1_import(path: Path, binding_id: str) -> dict[str, Any]:
         raise ValueError("expected the frozen valid-failed Stage 1 result")
     if manifest.get("binding_id") != binding_id or report.get("binding_id") != binding_id:
         raise ValueError("Stage 1 and Stage 2 binding mismatch")
-    index = manifest.get("preserved_artifacts", {})
+    index = artifact_index(manifest.get("preserved_artifacts"))
     for rel in ("run-report.json", "evidence/candidate.diff", "evidence/executor.log"):
         record = index.get(rel)
         artifact = path / Path(rel)
         if not isinstance(record, dict) or not artifact.is_file():
             raise ValueError(f"missing hashed Stage 1 artifact: {rel}")
         data = artifact.read_bytes()
-        if sha256_bytes(data) != record.get("sha256") or len(data) != record.get("bytes"):
+        if sha256_bytes(data) != record.get("sha256") or len(data) != record.get("size_bytes"):
             raise ValueError(f"Stage 1 artifact hash/size mismatch: {rel}")
     return manifest
+
+
+def resolve_frozen_aider(binding: dict[str, Any], explicit: Path | None) -> str:
+    frozen = binding.get("scaffold", {}).get("executable_path")
+    if not isinstance(frozen, str) or not frozen:
+        raise ValueError("binding missing frozen scaffold executable_path")
+    frozen_path = Path(frozen).expanduser().resolve()
+    if explicit is not None and explicit.expanduser().resolve() != frozen_path:
+        raise ValueError("--aider-exe differs from frozen binding executable_path")
+    if not frozen_path.is_file():
+        raise ValueError(f"frozen Aider executable not found: {frozen_path}")
+    return str(frozen_path)
+
+
+def validate_aider_version(aider: str, binding: dict[str, Any]) -> str:
+    expected = binding.get("scaffold", {}).get("version_or_commit")
+    if not isinstance(expected, str) or not expected:
+        raise ValueError("binding missing frozen Aider version")
+    proc = run([aider, "--version"], timeout=30)
+    observed = next((x.strip() for x in (proc.stdout or proc.stderr or "").splitlines() if x.strip()), "")
+    if proc.returncode != 0 or observed != expected:
+        raise ValueError(f"Aider version mismatch: expected {expected!r}, observed {observed!r}")
+    return observed
 
 
 def main() -> int:
@@ -128,12 +169,10 @@ def main() -> int:
         raise SystemExit("WP-04 Stage 2 forbids retry/escalation")
     try:
         stage1_manifest = validate_stage1_import(args.stage1_import.resolve(), str(binding.get("binding_id")))
+        aider = resolve_frozen_aider(binding, args.aider_exe)
+        aider_version = validate_aider_version(aider, binding)
     except Exception as exc:
         raise SystemExit(f"STAGE2_BLOCKED: {exc}") from exc
-
-    aider = str(args.aider_exe) if args.aider_exe else shutil.which("aider")
-    if not aider or not Path(aider).exists():
-        raise SystemExit("aider executable not found")
 
     out = args.out_dir.resolve()
     if out.exists():
@@ -210,6 +249,7 @@ def main() -> int:
         "base_sha": task["base_sha"],
         "binding_id": binding.get("binding_id"),
         "executor_identity": binding.get("exact_executor_identity"),
+        "aider_version_revalidated": aider_version,
         "stage1_import_manifest_schema": stage1_manifest.get("schema_id"),
         "stage1_candidate_diff_sha256": stage1_manifest.get("candidate_diff_sha256"),
         "materialization_origin": origin,
