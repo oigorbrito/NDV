@@ -15,12 +15,15 @@
     "upstream_parser_repository": "SWE-rebench/SWE-rebench-V2",
     "upstream_parser_revision": "c71902a8cf8d2b725f63d51f199f4d3e56f68d2d",
     "upstream_parser_path": "lib/agent/log_parsers.py",
-    "allowed_classifications": [
-      "EXPECTED_BASE_BEHAVIOR",
-      "ORACLE_MISMATCH",
-      "ENVIRONMENT_INCONCLUSIVE"
-    ],
+    "allowed_classifications": ["EXPECTED_BASE_BEHAVIOR", "ORACLE_MISMATCH", "ENVIRONMENT_INCONCLUSIVE"],
     "audit_pass_requires": "EXPECTED_BASE_BEHAVIOR"
+  },
+  "verifier_evidence_builder": {
+    "ndv_tool": "tools/ndv_build_s2_verifier_evidence.py",
+    "focal_source": "FAIL_TO_PASS",
+    "preservation_source": "PASS_TO_PASS",
+    "gold_solution_content_in_output": "FORBIDDEN",
+    "outputs": ["focal-verifier.json", "preservation-verifier.json", "verifier-provenance.json", "bundle.json"]
   },
   "audit_requirements": [
     "quarantine_status PASS",
@@ -35,7 +38,9 @@
     "base log is interpreted by the frozen upstream parser",
     "oracle interpretation classification is EXPECTED_BASE_BEHAVIOR",
     "expected base behavior observed and recorded",
-    "focal verifier evidence identifies at least one fail-to-pass expectation where applicable",
+    "focal verifier artifact is frozen and hashed",
+    "preservation verifier artifact is frozen and hashed",
+    "verifier provenance artifact is frozen and hashed",
     "preservation baseline is executable and recorded",
     "candidate patch/gold patch is never exposed to executor during admission",
     "infrastructure failure is distinguishable from oracle/product failure"
@@ -82,11 +87,16 @@
       "oracle_interpretation_sha256",
       "oracle_classification",
       "focal_verifier_ref",
+      "focal_verifier_sha256",
       "preservation_ref",
+      "preservation_sha256",
       "verifier_provenance_ref",
+      "verifier_provenance_sha256",
       "environment_ref"
     ],
     "required_oracle_classification": "EXPECTED_BASE_BEHAVIOR"
   },
+  "admission_decision_tool": "tools/ndv_decide_s2_admission.py",
+  "admission_record_tool": "tools/ndv_freeze_s2_admission.py",
   "treatment_execution": "FORBIDDEN"
 }
