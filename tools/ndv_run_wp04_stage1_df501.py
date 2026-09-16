@@ -168,14 +168,12 @@ def main() -> int:
             "executor_wall_seconds": executor_seconds,
             "token_usage": "EXPLICIT_MISSINGNESS_UNLESS_PRESENT_IN_EXECUTOR_LOGS",
             "monetary_cost": "LOCAL_COST_NOT_CONVERTED_TO_TOKENS",
-            "failure_resources_retained": true
+            "failure_resources_retained": True
         },
         "outcome": outcome,
         "failure_attribution": attribution,
         "stage2_release": "YES" if outcome in {"SMOKE_VALID_SOLVED", "SMOKE_VALID_FAILED", "SMOKE_INCONCLUSIVE"} else "NO"
     }
-    # Python boolean fix before serialization
-    report["accounting"]["failure_resources_retained"] = True
     (out / "run-report.json").write_text(json.dumps(report, indent=2, sort_keys=True, ensure_ascii=False) + "\n", encoding="utf-8")
     print(json.dumps({"outcome": outcome, "failure_attribution": attribution, "report": str(out / "run-report.json")}, indent=2))
     return 0 if outcome == "SMOKE_VALID_SOLVED" else 2
