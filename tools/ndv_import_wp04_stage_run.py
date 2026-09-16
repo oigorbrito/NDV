@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Import one user-executed WP-04 run evidence bundle.
+"""Import one user-executed WP-04 stage bundle into the repository.
 
-Only immutable evidence is preserved: run-report.json, evidence/, and a hashed
-import manifest. Workspace clones, virtual environments, caches, and other
-execution scratch state are deliberately excluded.
+The importer never re-executes a treatment. It validates the persisted bundle,
+re-hashes candidate evidence, reconciles token telemetry from Aider logs when
+available, and copies only immutable evidence (never workspace/ or venv/) under
+pilot-runs/.
 """
 from __future__ import annotations
 
@@ -16,7 +17,10 @@ from pathlib import Path
 from typing import Any
 
 TOKEN_RE = re.compile(r"Tokens:\s*([0-9]+(?:\.[0-9]+)?)([kKmM]?)\s+sent,\s*([0-9]+(?:\.[0-9]+)?)([kKmM]?)\s+received")
-ALLOWED_RUN_SCHEMAS = {"ndv-wp04-stage1-run-v1", "ndv-wp04-stage2-run-v1"}
+SCHEMA_TASK = {
+    "ndv-wp04-stage1-run-v1": "D-F5-01",
+    "ndv-wp04-stage2-run-v1": "D-F6-01",
+}
 
 
 def load(path: Path) -> Any:
@@ -54,37 +58,36 @@ def parse_aider_tokens(text: str) -> dict[str, Any]:
     }
 
 
-def evidence_files(run_dir: Path) -> list[Path]:
-    evidence = run_dir / "evidence"
-    files = [run_dir / "run-report.json"]
-    files.extend(sorted(p for p in evidence.rglob("*") if p.is_file()))
-    return files
-
-
-def artifact_index(root: Path, files: list[Path]) -> dict[str, dict[str, Any]]:
-    result: dict[str, dict[str, Any]] = {}
-    for path in files:
-        if path.is_symlink():
-            raise ValueError(f"symlink evidence is not accepted: {path}")
+def artifact_manifest(root: Path) -> list[dict[str, Any]]:
+    records: list[dict[str, Any]] = []
+    for path in sorted(p for p in root.rglob("*") if p.is_file()):
         data = path.read_bytes()
-        rel = path.relative_to(root).as_posix()
-        result[rel] = {"sha256": sha256_bytes(data), "bytes": len(data)}
-    return result
+        records.append({
+            "path": path.relative_to(root).as_posix(),
+            "size_bytes": len(data),
+            "sha256": sha256_bytes(data),
+        })
+    return records
 
 
-def validate_bundle(run_dir: Path) -> tuple[dict[str, Any], dict[str, Any], list[Path]]:
+def validate_bundle(run_dir: Path) -> tuple[dict[str, Any], dict[str, Any]]:
     report_path = run_dir / "run-report.json"
     evidence = run_dir / "evidence"
     if not report_path.is_file() or not evidence.is_dir():
         raise ValueError("run-report.json and evidence/ are required")
     report = load(report_path)
-    if report.get("schema_id") not in ALLOWED_RUN_SCHEMAS:
-        raise ValueError("unexpected run-report schema")
+    schema = report.get("schema_id")
+    expected_task = SCHEMA_TASK.get(schema)
+    if expected_task is None:
+        raise ValueError(f"unexpected run-report schema: {schema!r}")
+    if report.get("task_id") != expected_task:
+        raise ValueError("task_id does not match run-report schema")
     if report.get("retry_count") != 0 or report.get("escalation_count") != 0:
         raise ValueError("WP-04 import refuses retry/escalation")
     if report.get("holdout_access") != "NONE":
         raise ValueError("WP-04 import refuses holdout access")
-
+    if report.get("outcome") not in {"SMOKE_VALID_SOLVED", "SMOKE_VALID_FAILED", "SMOKE_INCONCLUSIVE"}:
+        raise ValueError("invalid WP-04 outcome")
     candidate = evidence / "candidate.diff"
     executor_log = evidence / "executor.log"
     if not candidate.is_file() or not executor_log.is_file():
@@ -95,19 +98,8 @@ def validate_bundle(run_dir: Path) -> tuple[dict[str, Any], dict[str, Any], list
         raise ValueError("candidate.diff hash does not match run-report")
     if len(candidate_bytes) != report.get("candidate", {}).get("diff_bytes"):
         raise ValueError("candidate.diff size does not match run-report")
-
     tokens = parse_aider_tokens(executor_log.read_text(encoding="utf-8", errors="replace"))
-    files = evidence_files(run_dir)
-    return report, tokens, files
-
-
-def copy_evidence_only(run_dir: Path, dest: Path, files: list[Path]) -> None:
-    dest.mkdir(parents=True, exist_ok=False)
-    for source in files:
-        rel = source.relative_to(run_dir)
-        target = dest / rel
-        target.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(source, target)
+    return report, tokens
 
 
 def main() -> int:
@@ -121,12 +113,15 @@ def main() -> int:
     if dest.exists():
         raise SystemExit(f"destination exists; refusing overwrite: {dest}")
     try:
-        report, tokens, files = validate_bundle(run_dir)
-        source_artifacts = artifact_index(run_dir, files)
+        report, tokens = validate_bundle(run_dir)
     except Exception as exc:
         raise SystemExit(f"IMPORT_REJECTED: {exc}") from exc
 
-    copy_evidence_only(run_dir, dest, files)
+    dest.mkdir(parents=True)
+    shutil.copy2(run_dir / "run-report.json", dest / "run-report.json")
+    shutil.copytree(run_dir / "evidence", dest / "evidence")
+
+    preserved = artifact_manifest(dest)
     manifest = {
         "schema_id": "ndv-wp04-import-manifest-v2",
         "source_run_schema": report["schema_id"],
@@ -139,10 +134,10 @@ def main() -> int:
         "holdout_access": report.get("holdout_access"),
         "candidate_diff_sha256": report.get("candidate", {}).get("diff_sha256"),
         "candidate_diff_bytes": report.get("candidate", {}).get("diff_bytes"),
-        "executor_wall_seconds": report.get("accounting", {}).get("executor_wall_seconds") or report.get("executor", {}).get("wall_seconds"),
+        "executor_wall_seconds": report.get("accounting", {}).get("executor_wall_seconds", report.get("executor", {}).get("wall_seconds")),
         "token_reconciliation": tokens,
-        "preserved_artifacts": source_artifacts,
-        "excluded_scratch": ["workspace/", "verifier-venv/", "caches/"],
+        "preserved_artifacts": preserved,
+        "excluded_from_import": ["workspace/", "verifier-venv/"],
         "raw_evidence_preserved": True,
         "treatment_reexecuted": False,
     }
