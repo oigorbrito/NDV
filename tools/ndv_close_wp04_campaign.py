@@ -26,15 +26,22 @@ def sha256_bytes(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
-def verify_import(import_dir: Path, expected_task: str) -> tuple[dict[str, Any], dict[str, Any]]:
-    manifest_path = import_dir / "import-manifest.json"
+def manifest_path(import_dir: Path) -> Path:
+    sidecar = import_dir / "import-manifest-v2.json"
+    return sidecar if sidecar.is_file() else import_dir / "import-manifest.json"
+
+
+def verify_import(import_dir: Path, expected_task: str) -> tuple[dict[str, Any], dict[str, Any], Path]:
+    selected_manifest = manifest_path(import_dir)
     report_path = import_dir / "run-report.json"
-    if not manifest_path.is_file() or not report_path.is_file():
-        raise ValueError(f"{expected_task}: import-manifest.json and run-report.json required")
-    manifest = load(manifest_path)
+    if not selected_manifest.is_file() or not report_path.is_file():
+        raise ValueError(f"{expected_task}: import manifest and run-report.json required")
+    manifest = load(selected_manifest)
     report = load(report_path)
     if manifest.get("schema_id") != "ndv-wp04-import-manifest-v2":
         raise ValueError(f"{expected_task}: import manifest v2 required")
+    if manifest.get("raw_evidence_preserved") is not True or manifest.get("treatment_reexecuted") is not False:
+        raise ValueError(f"{expected_task}: import provenance invalid")
     if manifest.get("task_id") != expected_task or report.get("task_id") != expected_task:
         raise ValueError(f"{expected_task}: task identity mismatch")
     if manifest.get("source_run_schema") != EXPECTED[expected_task] or report.get("schema_id") != EXPECTED[expected_task]:
@@ -52,17 +59,24 @@ def verify_import(import_dir: Path, expected_task: str) -> tuple[dict[str, Any],
     records = manifest.get("preserved_artifacts")
     if not isinstance(records, list) or not records:
         raise ValueError(f"{expected_task}: preserved artifact inventory missing")
+    seen: set[str] = set()
     for record in records:
-        rel = record.get("path")
-        if not isinstance(rel, str) or rel == "import-manifest.json":
+        if not isinstance(record, dict):
             raise ValueError(f"{expected_task}: invalid artifact inventory entry")
+        rel = record.get("path")
+        if not isinstance(rel, str) or not rel or rel in seen or rel in {"import-manifest.json", "import-manifest-v2.json"}:
+            raise ValueError(f"{expected_task}: invalid artifact inventory entry")
+        seen.add(rel)
         path = import_dir / rel
         if not path.is_file():
             raise ValueError(f"{expected_task}: missing preserved artifact {rel}")
         data = path.read_bytes()
         if len(data) != record.get("size_bytes") or sha256_bytes(data) != record.get("sha256"):
             raise ValueError(f"{expected_task}: preserved artifact hash mismatch: {rel}")
-    return manifest, report
+    for required in ("run-report.json", "evidence/candidate.diff", "evidence/executor.log"):
+        if required not in seen:
+            raise ValueError(f"{expected_task}: required preserved artifact missing from inventory: {required}")
+    return manifest, report, selected_manifest
 
 
 def token_total(manifest: dict[str, Any]) -> tuple[int | None, bool]:
@@ -80,8 +94,8 @@ def main() -> int:
     args = ap.parse_args()
 
     try:
-        m1, r1 = verify_import(args.stage1_import.resolve(), "D-F5-01")
-        m2, r2 = verify_import(args.stage2_import.resolve(), "D-F6-01")
+        m1, r1, mp1 = verify_import(args.stage1_import.resolve(), "D-F5-01")
+        m2, r2, mp2 = verify_import(args.stage2_import.resolve(), "D-F6-01")
     except Exception as exc:
         raise SystemExit(f"WP04_CLOSURE_BLOCKED: {exc}") from exc
 
@@ -114,9 +128,11 @@ def main() -> int:
             "missing_telemetry_never_zero": True,
         },
         "integrity": {
-            "stage1_import_manifest": str(args.stage1_import / "import-manifest.json"),
-            "stage2_import_manifest": str(args.stage2_import / "import-manifest.json"),
+            "stage1_import_manifest": str(mp1),
+            "stage2_import_manifest": str(mp2),
             "same_binding_required": True,
+            "raw_evidence_preserved": True,
+            "treatment_reexecuted": False,
             "retries": 0,
             "escalations": 0,
             "holdout_access": "NONE",
