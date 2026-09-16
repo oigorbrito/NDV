@@ -17,6 +17,9 @@ BASE = {
             "gold_patch_applied_in_base_mode": False,
             "base_run_ref": None,
             "base_run_sha256": None,
+            "oracle_interpretation_ref": None,
+            "oracle_interpretation_sha256": None,
+            "oracle_classification": None,
             "base_behavior_matches_expected": None,
             "focal_verifier_ref": None,
             "preservation_ref": None,
@@ -53,6 +56,30 @@ class AuditValidatorTests(unittest.TestCase):
         rec["quarantine_status"] = "PASS"
         errors = validate(payload)
         self.assertTrue(any("AUDIT_PASS requires image_digest" in e for e in errors))
+        self.assertTrue(any("oracle_interpretation_ref" in e for e in errors))
+
+    def test_oracle_mismatch_blocks_audit_pass(self):
+        payload = copy.deepcopy(BASE)
+        rec = payload["audits"][0]
+        rec.update({
+            "status": "AUDIT_PASS",
+            "quarantine_status": "PASS",
+            "image_digest": "sha256:" + "a" * 64,
+            "base_run_ref": "runs/base.json",
+            "base_run_sha256": "b" * 64,
+            "oracle_interpretation_ref": "oracle/base.json",
+            "oracle_interpretation_sha256": "c" * 64,
+            "oracle_classification": "ORACLE_MISMATCH",
+            "base_behavior_matches_expected": True,
+            "focal_verifier_ref": "verifier/focal.json",
+            "preservation_ref": "verifier/preservation.json",
+            "preservation_baseline_pass": True,
+            "verifier_provenance_ref": "verifier/provenance.json",
+            "verifier_independent": True,
+            "environment_ref": "environment/image.json",
+        })
+        errors = validate(payload)
+        self.assertTrue(any("EXPECTED_BASE_BEHAVIOR" in e for e in errors))
 
     def test_complete_audit_pass_is_valid(self):
         payload = copy.deepcopy(BASE)
@@ -63,6 +90,9 @@ class AuditValidatorTests(unittest.TestCase):
             "image_digest": "sha256:" + "a" * 64,
             "base_run_ref": "runs/base.json",
             "base_run_sha256": "b" * 64,
+            "oracle_interpretation_ref": "oracle/base.json",
+            "oracle_interpretation_sha256": "c" * 64,
+            "oracle_classification": "EXPECTED_BASE_BEHAVIOR",
             "base_behavior_matches_expected": True,
             "focal_verifier_ref": "verifier/focal.json",
             "preservation_ref": "verifier/preservation.json",
