@@ -10,6 +10,14 @@
   "historical_artifact_policy": "REFERENCE_NOT_REWRITE",
   "full_git_history_import": false,
   "legacy_artifact_copy_policy": "COPY_ONLY_WHEN_TECHNICALLY_NECESSARY_AND_RETAIN_SOURCE_PROVENANCE",
+  "normative_historical_p1_corpus": {
+    "path": "experiments/p1/p1-development-corpus-v6.json",
+    "blob_sha": "5b666b3f9e5c3e6eafbfbb3139b0fa256f2185fb",
+    "corpus_id": "p1-development-corpus-v6",
+    "admitted_tasks": ["D-F2-05", "D-F2-06", "D-F5-01", "D-F6-01"],
+    "counts": {"tasks": 4, "families": 3, "repositories": 3},
+    "comparative_corpus_ready": "NO"
+  },
   "preserved_contract_paths": [
     "experiments/p1/task-admissibility-contract-v1.json",
     "experiments/p1/executor-screening-contract-v1.json",
@@ -19,7 +27,8 @@
     "experiments/p1/p1-holdout-policy-v1.json",
     "experiments/p1/architecture-decision-gate-v1.json",
     "experiments/p1/run-spec-v1.template.json",
-    "experiments/p1/run-result-v1.schema.json"
+    "experiments/p1/run-result-v1.schema.json",
+    "experiments/p1/p1-development-corpus-v6.json"
   ],
   "reused_tool_artifacts": [
     {
@@ -40,6 +49,7 @@
     "Prospective work created after cutover uses NDV naming and this repository.",
     "A copied legacy artifact must retain an explicit source repository, source commit, source path, and integrity reference.",
     "Historical pilot runs must never be relabeled as NDV runs.",
-    "Reused historical tools remain historical artifacts; NDV wrappers must not silently change their semantics."
+    "Reused historical tools remain historical artifacts; NDV wrappers must not silently change their semantics.",
+    "The final normative historical P1 corpus at cutover is p1-development-corpus-v6; intermediate corpus versions remain historical snapshots, not cutover authority."
   ]
 }
