@@ -6,35 +6,32 @@
     "commit": "66f3a218fba800daed5d86fdfce386491b8ab0e8",
     "path": "experiments/p1/task-admissibility-contract-v1.json"
   },
-  "historical_admitted_tasks": ["D-F5-01", "D-F6-01"],
+  "historical_normative_corpus": {
+    "repository": "oigorbrito/dv",
+    "commit": "66f3a218fba800daed5d86fdfce386491b8ab0e8",
+    "path": "experiments/p1/p1-development-corpus-v6.json",
+    "blob_sha": "5b666b3f9e5c3e6eafbfbb3139b0fa256f2185fb",
+    "corpus_id": "p1-development-corpus-v6",
+    "comparative_corpus_ready": "NO"
+  },
+  "historical_admitted_tasks": ["D-F2-05", "D-F2-06", "D-F5-01", "D-F6-01"],
+  "historical_counts": {
+    "tasks": 4,
+    "families": 3,
+    "repositories": 3
+  },
   "target": {
     "initial_admitted_tasks": 9,
     "minimum_families": 3,
     "minimum_repositories": 3,
     "minimum_languages": 2,
-    "note": "Operational target, not a universal statistical power claim."
+    "note": "Operational target, not a universal statistical power claim. Historical DV corpus v6 contributes four admitted tasks but remains comparative_corpus_ready=NO."
   },
   "source_priority": [
-    {
-      "source_id": "SRC-SWE-REBENCH-V2",
-      "role": "PRIMARY_DEVELOPMENT_ACQUISITION",
-      "status": "SCREEN_SOURCE_NOT_INSTANCES"
-    },
-    {
-      "source_id": "SRC-OMNICODE",
-      "role": "SECONDARY_TASK-TYPE_DIVERSITY",
-      "status": "SCREEN_SOURCE_NOT_INSTANCES"
-    },
-    {
-      "source_id": "SRC-SWEBENCH-PRO-VERIFIED",
-      "role": "LATER_CONFIRMATION_CANDIDATE",
-      "status": "PRESERVE_WHERE_POSSIBLE"
-    },
-    {
-      "source_id": "SRC-TERMINAL-BENCH-2",
-      "role": "LATER_HETEROGENEITY_GENERALIZATION",
-      "status": "NOT_PRIMARY_P1_S2_SOURCE"
-    }
+    {"source_id": "SRC-SWE-REBENCH-V2", "role": "PRIMARY_DEVELOPMENT_ACQUISITION", "status": "SCREEN_SOURCE_NOT_INSTANCES"},
+    {"source_id": "SRC-OMNICODE", "role": "SECONDARY_TASK-TYPE_DIVERSITY", "status": "SCREEN_SOURCE_NOT_INSTANCES"},
+    {"source_id": "SRC-SWEBENCH-PRO-VERIFIED", "role": "LATER_CONFIRMATION_CANDIDATE", "status": "PRESERVE_WHERE_POSSIBLE"},
+    {"source_id": "SRC-TERMINAL-BENCH-2", "role": "LATER_HETEROGENEITY_GENERALIZATION", "status": "NOT_PRIMARY_P1_S2_SOURCE"}
   ],
   "screening_order": [
     "discover candidate",
@@ -52,33 +49,15 @@
     "admit and freeze or reject explicitly"
   ],
   "candidate_required_fields": [
-    "candidate_id",
-    "source_id",
-    "repository",
-    "base_revision",
-    "task_statement_ref",
-    "task_statement_sha256",
-    "language",
-    "proposed_family",
-    "focal_verifier_ref",
-    "verifier_provenance",
-    "verifier_independent",
-    "preservation_ref",
-    "environment_ref",
-    "base_behavior",
-    "solution_isolation",
-    "disposition",
-    "disposition_reason"
+    "candidate_id", "source_id", "repository", "base_revision", "task_statement_ref",
+    "task_statement_sha256", "language", "proposed_family", "focal_verifier_ref",
+    "verifier_provenance", "verifier_independent", "preservation_ref", "environment_ref",
+    "base_behavior", "solution_isolation", "disposition", "disposition_reason"
   ],
   "allowed_dispositions": [
-    "DISCOVERED",
-    "SCREENING",
-    "ADMITTED",
-    "REJECTED_INVALID_ORACLE",
-    "REJECTED_VERIFIER_ARTIFACT_UNAVAILABLE",
-    "REJECTED_ENVIRONMENT_NOT_REPRODUCIBLE",
-    "REJECTED_BASE_UNUSABLE",
-    "REJECTED_SOLUTION_LEAKAGE_REQUIRED",
+    "DISCOVERED", "SCREENING", "ADMITTED", "REJECTED_INVALID_ORACLE",
+    "REJECTED_VERIFIER_ARTIFACT_UNAVAILABLE", "REJECTED_ENVIRONMENT_NOT_REPRODUCIBLE",
+    "REJECTED_BASE_UNUSABLE", "REJECTED_SOLUTION_LEAKAGE_REQUIRED",
     "REJECTED_OTHER_EXPLICIT_REASON"
   ],
   "selection_prohibitions": [
@@ -89,15 +68,8 @@
     "Do not access sealed holdout material during development acquisition."
   ],
   "task_profile_fields": [
-    "spread",
-    "novelty",
-    "centrality",
-    "tool_intensity",
-    "sequential_depth",
-    "parallelizability",
-    "specification_ambiguity",
-    "verification_strength",
-    "context_footprint"
+    "spread", "novelty", "centrality", "tool_intensity", "sequential_depth",
+    "parallelizability", "specification_ambiguity", "verification_strength", "context_footprint"
   ],
   "treatment_execution": "FORBIDDEN_DURING_DISCOVERY"
 }
