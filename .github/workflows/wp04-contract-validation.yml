@@ -14,8 +14,10 @@ on:
       - 'tools/ndv_verify_df501_structural.py'
       - 'tools/test_ndv_verify_df501_structural.py'
       - 'tools/ndv_verify_df601_structural.py'
+      - 'tools/test_ndv_verify_df601_structural.py'
       - 'tools/ndv_run_wp04_stage1_df501.py'
       - 'tools/ndv_run_wp04_stage2_df601.py'
+      - 'tools/test_ndv_run_wp04_stage2_df601.py'
       - 'tools/ndv_import_wp04_stage_run.py'
       - 'tools/test_ndv_import_wp04_stage_run.py'
       - '.github/workflows/wp04-contract-validation.yml'
@@ -32,8 +34,10 @@ on:
       - 'tools/ndv_verify_df501_structural.py'
       - 'tools/test_ndv_verify_df501_structural.py'
       - 'tools/ndv_verify_df601_structural.py'
+      - 'tools/test_ndv_verify_df601_structural.py'
       - 'tools/ndv_run_wp04_stage1_df501.py'
       - 'tools/ndv_run_wp04_stage2_df601.py'
+      - 'tools/test_ndv_run_wp04_stage2_df601.py'
       - 'tools/ndv_import_wp04_stage_run.py'
       - 'tools/test_ndv_import_wp04_stage_run.py'
       - '.github/workflows/wp04-contract-validation.yml'
@@ -71,4 +75,6 @@ jobs:
         run: |
           python -m unittest -v test_ndv_validate_wp04_smoke.py
           python -m unittest -v test_ndv_verify_df501_structural.py
+          python -m unittest -v test_ndv_verify_df601_structural.py
           python -m unittest -v test_ndv_import_wp04_stage_run.py
+          python -m unittest -v test_ndv_run_wp04_stage2_df601.py
