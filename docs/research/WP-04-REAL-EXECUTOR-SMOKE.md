@@ -18,6 +18,8 @@ WP-03 passed in GitHub Actions run `35100959680`. The uploaded deterministic smo
 
 Therefore the harness-mechanics blocker is closed.
 
+The frozen WP-04 campaign contract and its validator were independently exercised by GitHub Actions run `35106775556`; the `validate` job completed successfully, including both static contract validation and `tools/test_ndv_validate_wp04_smoke.py`.
+
 ## Provider-neutral design, concrete execution
 
 The campaign definition is provider-neutral. An execution is not.
@@ -132,7 +134,9 @@ Even after WP-04 passes, `P1_COMPARATIVE_READY` remains a separate gate requirin
 ```text
 WP-03 = PASS
 WP-04_CONTRACT = FROZEN
+WP-04_CONTRACT_VALIDATION = PASS (GitHub Actions run 35106775556)
 WP-04_EXECUTOR_BINDING = NOT_YET_FROZEN
 WP-04_EXECUTION = NOT_YET_EXECUTED
+NEXT_BLOCKER = QUALIFY_AND_FREEZE_ONE_CONCRETE_EXECUTOR_SURFACE
 COMPARATIVE_AUTHORITY = NONE
 ```
