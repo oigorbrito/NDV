@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """Run WP-04 Stage 1 (D-F5-01) with one frozen binding-v2.
 
-Flow: materialize exact base -> frozen offline environment setup -> baseline
-preservation PASS and structural focal FAIL -> one Aider+Ollama execution ->
-candidate capture -> structural focal + preservation verification -> accounting
-and attribution. No retry, fallback, escalation, or holdout access is implemented.
+Flow: materialize exact base -> pinned verifier-toolchain bootstrap (pre-exposure)
+-> offline editable install -> baseline preservation PASS and structural focal
+FAIL -> one Aider+Ollama execution -> candidate capture -> structural focal +
+preservation verification -> accounting and attribution. No retry, fallback,
+escalation, or holdout access is implemented.
 """
 from __future__ import annotations
 
@@ -21,6 +22,7 @@ from pathlib import Path
 from typing import Any
 
 TASK_PATH = Path("experiments/p1/wp04-stage1-d-f5-01-v1.json")
+ENV_PATH = Path("experiments/p1/wp04-stage1-verifier-env-v1.json")
 STRUCTURAL_VERIFIER = Path(__file__).with_name("ndv_verify_df501_structural.py").resolve()
 
 
@@ -40,6 +42,11 @@ def write_log(path: Path, proc: subprocess.CompletedProcess[str]) -> None:
     path.write_text((proc.stdout or "") + ("\n[stderr]\n" + proc.stderr if proc.stderr else ""), encoding="utf-8")
 
 
+def tail_text(text: str, limit: int = 2000) -> str:
+    text = text or ""
+    return text[-limit:]
+
+
 def require_clean_exact_base(workspace: Path, base_sha: str) -> None:
     head = run(["git", "rev-parse", "HEAD"], workspace, 30)
     if head.returncode != 0 or head.stdout.strip() != base_sha:
@@ -57,12 +64,6 @@ def source_origin(source_repo: Path) -> str:
 
 
 def materialize_exact_base(source_repo: Path, workspace: Path, base_sha: str, evidence_dir: Path) -> str:
-    """Materialize the historical base from source origin before task exposure.
-
-    The local clone supplies only the authenticated/canonical origin URL. The
-    workspace fetches the exact historical SHA explicitly so shallow/partial
-    local clones cannot silently omit required objects.
-    """
     origin = source_origin(source_repo)
     clone = run(["git", "clone", "--no-checkout", origin, str(workspace)], timeout=600)
     write_log(evidence_dir / "materialization-clone.log", clone)
@@ -91,6 +92,46 @@ def venv_python(venv: Path) -> Path:
     return venv / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
 
 
+def bootstrap_verifier_toolchain(py: str, cfg: dict[str, Any], evidence_dir: Path) -> None:
+    wanted_pip = cfg["verifier_toolchain"]["pip"]
+    wanted_setuptools = cfg["verifier_toolchain"]["setuptools"]
+    probe_code = (
+        "import pip, setuptools; "
+        "print('pip=' + pip.__version__); print('setuptools=' + setuptools.__version__)"
+    )
+    before = run([py, "-c", probe_code], timeout=60)
+    write_log(evidence_dir / "environment-toolchain-before.log", before)
+
+    exact = False
+    if before.returncode == 0:
+        lines = {x.strip() for x in before.stdout.splitlines()}
+        exact = f"pip={wanted_pip}" in lines and f"setuptools={wanted_setuptools}" in lines
+
+    if not exact:
+        bootstrap = run([
+            py,
+            "-m",
+            "pip",
+            "install",
+            "--disable-pip-version-check",
+            "--no-deps",
+            f"pip=={wanted_pip}",
+            f"setuptools=={wanted_setuptools}",
+        ], timeout=600)
+        write_log(evidence_dir / "environment-toolchain-bootstrap.log", bootstrap)
+        if bootstrap.returncode != 0:
+            detail = tail_text((bootstrap.stdout or "") + "\n" + (bootstrap.stderr or ""))
+            raise RuntimeError(f"pinned verifier toolchain bootstrap failed: {detail}")
+
+    after = run([py, "-c", probe_code], timeout=60)
+    write_log(evidence_dir / "environment-toolchain-after.log", after)
+    if after.returncode != 0:
+        raise RuntimeError("pinned verifier toolchain cannot be imported after bootstrap")
+    lines = {x.strip() for x in after.stdout.splitlines()}
+    if f"pip={wanted_pip}" not in lines or f"setuptools={wanted_setuptools}" not in lines:
+        raise RuntimeError(f"verifier toolchain version mismatch after bootstrap: {after.stdout.strip()}")
+
+
 def classify(focal_rc: int, preservation_rc: int, executor_rc: int, timed_out: bool) -> tuple[str, str]:
     if timed_out:
         return "SMOKE_INCONCLUSIVE", "RESOURCE_LIMIT"
@@ -111,6 +152,7 @@ def main() -> int:
     args = ap.parse_args()
 
     task = load(TASK_PATH)
+    env_cfg = load(ENV_PATH)
     binding = load(args.binding)
     if binding.get("schema_id") != "ndv-p1-wp04-executor-binding-v2" or binding.get("status") != "QUALIFIED":
         raise SystemExit("binding-v2 with status=QUALIFIED required")
@@ -118,6 +160,8 @@ def main() -> int:
         raise SystemExit("WP-04 Stage 1 forbids retry/escalation")
     if not args.source_repo.exists():
         raise SystemExit(f"source repo does not exist: {args.source_repo}")
+    if sys.version_info[:2] != (3, 13):
+        raise SystemExit(f"ENVIRONMENT_BLOCKED_PRE_EXPOSURE: Python 3.13.x required by frozen verifier environment, observed {sys.version.split()[0]}")
 
     aider = str(args.aider_exe) if args.aider_exe else shutil.which("aider")
     if not aider or not Path(aider).exists():
@@ -131,26 +175,29 @@ def main() -> int:
         raise SystemExit(f"out-dir already exists; refusing overwrite: {out}")
     evidence_dir.mkdir(parents=True)
 
-    # PRE-EXPOSURE MATERIALIZATION. Network is allowed only to acquire the exact
-    # frozen repository revision. No task text is sent to any executor here.
     try:
         origin = materialize_exact_base(args.source_repo.resolve(), workspace, task["base_sha"], evidence_dir)
     except Exception as exc:
         raise SystemExit(f"MATERIALIZATION_BLOCKED_PRE_EXPOSURE: {exc}") from exc
 
-    # Reproduce the historically admitted offline verifier environment.
     create_venv = run([sys.executable, "-m", "venv", "--system-site-packages", str(venv)], timeout=180)
     write_log(evidence_dir / "environment-venv.log", create_venv)
     if create_venv.returncode != 0:
         raise SystemExit("ENVIRONMENT_BLOCKED_PRE_EXPOSURE: verifier venv creation failed")
     py = str(venv_python(venv))
+
+    try:
+        bootstrap_verifier_toolchain(py, env_cfg, evidence_dir)
+    except Exception as exc:
+        raise SystemExit(f"ENVIRONMENT_BLOCKED_PRE_EXPOSURE: {exc}") from exc
+
     install = run([py, "-m", "pip", "install", "--no-index", "--no-deps", "--no-build-isolation", "--editable", str(workspace)], workspace, 300)
     write_log(evidence_dir / "environment-install.log", install)
     if install.returncode != 0:
-        raise SystemExit("ENVIRONMENT_BLOCKED_PRE_EXPOSURE: frozen offline editable install failed")
+        detail = tail_text((install.stdout or "") + "\n" + (install.stderr or ""))
+        raise SystemExit(f"ENVIRONMENT_BLOCKED_PRE_EXPOSURE: frozen offline editable install failed: {detail}")
     require_clean_exact_base(workspace, task["base_sha"])
 
-    # Oracle discriminability gate: base must fail focal but pass preservation.
     base_focal = run([sys.executable, str(STRUCTURAL_VERIFIER), "--workspace", str(workspace)], timeout=60)
     write_log(evidence_dir / "baseline-focal.log", base_focal)
     if base_focal.returncode == 0:
@@ -159,10 +206,10 @@ def main() -> int:
     base_preservation = run(preservation_argv, workspace, 1800)
     write_log(evidence_dir / "baseline-preservation.log", base_preservation)
     if base_preservation.returncode != 0:
-        raise SystemExit("ENVIRONMENT_DRIFT_PRE_EXPOSURE: baseline preservation failed")
+        detail = tail_text((base_preservation.stdout or "") + "\n" + (base_preservation.stderr or ""))
+        raise SystemExit(f"ENVIRONMENT_DRIFT_PRE_EXPOSURE: baseline preservation failed: {detail}")
     require_clean_exact_base(workspace, task["base_sha"])
 
-    # First and only treatment exposure starts here.
     started = datetime.now(timezone.utc).isoformat()
     env = os.environ.copy()
     env["OLLAMA_API_BASE"] = "http://127.0.0.1:11434"
@@ -212,7 +259,15 @@ def main() -> int:
             "origin": origin,
             "exact_sha_fetched": task["base_sha"],
             "network_used_before_task_exposure": True,
-            "task_exposed_during_materialization": False,
+            "task_exposed_during_materialization": False
+        },
+        "verifier_environment": {
+            "contract_ref": str(ENV_PATH),
+            "python": sys.version.split()[0],
+            "pinned_pip": env_cfg["verifier_toolchain"]["pip"],
+            "pinned_setuptools": env_cfg["verifier_toolchain"]["setuptools"],
+            "bootstrap_network_allowed_pre_exposure": True,
+            "editable_install_network": "OFFLINE_NO_INDEX"
         },
         "started_at": started,
         "completed_at": datetime.now(timezone.utc).isoformat(),
@@ -221,34 +276,33 @@ def main() -> int:
         "holdout_access": "NONE",
         "baseline_gate": {
             "structural_focal_expected_fail_returncode": base_focal.returncode,
-            "preservation_returncode": base_preservation.returncode,
-            "environment_setup": "venv --system-site-packages + offline editable install",
+            "preservation_returncode": base_preservation.returncode
         },
         "executor": {
             "argv_redacted_task": [aider, "--model", f"ollama_chat/{model_name}", "--message", "<FROZEN_RAW_TASK>", "..."],
             "returncode": executor.returncode,
             "timed_out": timed_out,
             "wall_seconds": executor_seconds,
-            "log_ref": "evidence/executor.log",
+            "log_ref": "evidence/executor.log"
         },
         "candidate": {
             "diff_ref": "evidence/candidate.diff",
             "diff_sha256": sha256_text(diff_text),
-            "diff_bytes": len(diff_text.encode("utf-8")),
+            "diff_bytes": len(diff_text.encode("utf-8"))
         },
         "verification": {
             "focal": {"kind": "EXTERNAL_REQUIREMENT_STRUCTURAL", "returncode": focal.returncode, "log_ref": "evidence/candidate-focal.log"},
-            "preservation": {"argv": preservation_argv, "returncode": preservation.returncode, "log_ref": "evidence/candidate-preservation.log"},
+            "preservation": {"argv": preservation_argv, "returncode": preservation.returncode, "log_ref": "evidence/candidate-preservation.log"}
         },
         "accounting": {
             "executor_wall_seconds": executor_seconds,
             "token_usage": "EXPLICIT_MISSINGNESS_UNLESS_PRESENT_IN_EXECUTOR_LOG",
             "monetary_cost": "LOCAL_COST_NOT_CONVERTED_TO_TOKENS",
-            "failure_resources_retained": True,
+            "failure_resources_retained": True
         },
         "outcome": outcome,
         "failure_attribution": attribution,
-        "stage2_release": "YES",
+        "stage2_release": "YES"
     }
     (out / "run-report.json").write_text(json.dumps(report, indent=2, sort_keys=True, ensure_ascii=False) + "\n", encoding="utf-8")
     print(json.dumps({"outcome": outcome, "failure_attribution": attribution, "report": str(out / "run-report.json")}, indent=2))
