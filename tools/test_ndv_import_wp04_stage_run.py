@@ -1,8 +1,9 @@
+import json
 import tempfile
 import unittest
 from pathlib import Path
 
-from ndv_import_wp04_stage_run import evidence_files, parse_aider_tokens
+from ndv_import_wp04_stage_run import parse_aider_tokens, validate_bundle
 
 
 class WP04ImportTests(unittest.TestCase):
@@ -19,18 +20,49 @@ class WP04ImportTests(unittest.TestCase):
         self.assertIsNone(result["input_tokens"])
         self.assertIsNone(result["total_tokens"])
 
-    def test_preservation_excludes_workspace_and_venv(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
-            (root / "run-report.json").write_text("{}", encoding="utf-8")
-            (root / "evidence").mkdir()
-            (root / "evidence" / "executor.log").write_text("x", encoding="utf-8")
-            (root / "workspace").mkdir()
-            (root / "workspace" / "source.py").write_text("x", encoding="utf-8")
-            (root / "verifier-venv").mkdir()
-            (root / "verifier-venv" / "python.exe").write_text("x", encoding="utf-8")
-            rels = {p.relative_to(root).as_posix() for p in evidence_files(root)}
-            self.assertEqual(rels, {"run-report.json", "evidence/executor.log"})
+    def _bundle(self, schema: str, task: str) -> Path:
+        root = Path(self.tmp.name) / task
+        evidence = root / "evidence"
+        evidence.mkdir(parents=True)
+        (evidence / "candidate.diff").write_text("", encoding="utf-8")
+        (evidence / "executor.log").write_text("Tokens: 1k sent, 2 received.\n", encoding="utf-8")
+        report = {
+            "schema_id": schema,
+            "task_id": task,
+            "binding_id": "binding",
+            "retry_count": 0,
+            "escalation_count": 0,
+            "holdout_access": "NONE",
+            "outcome": "SMOKE_VALID_FAILED",
+            "failure_attribution": "PRODUCT_FAILURE",
+            "candidate": {
+                "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+                "diff_bytes": 0,
+            },
+            "executor": {"wall_seconds": 1.0},
+        }
+        (root / "run-report.json").write_text(json.dumps(report), encoding="utf-8")
+        return root
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_accepts_stage1_schema(self):
+        report, tokens = validate_bundle(self._bundle("ndv-wp04-stage1-run-v1", "D-F5-01"))
+        self.assertEqual(report["task_id"], "D-F5-01")
+        self.assertEqual(tokens["total_tokens"], 1002)
+
+    def test_accepts_stage2_schema(self):
+        report, tokens = validate_bundle(self._bundle("ndv-wp04-stage2-run-v1", "D-F6-01"))
+        self.assertEqual(report["task_id"], "D-F6-01")
+        self.assertEqual(tokens["total_tokens"], 1002)
+
+    def test_rejects_schema_task_mismatch(self):
+        with self.assertRaises(ValueError):
+            validate_bundle(self._bundle("ndv-wp04-stage2-run-v1", "D-F5-01"))
 
 
 if __name__ == "__main__":
