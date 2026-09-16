@@ -1,0 +1,21 @@
+{
+  "schema_id": "ndv-p1-s2-source-snapshot-v1",
+  "source_id": "SRC-SWE-REBENCH-V2",
+  "dataset": "nebius/SWE-rebench-V2",
+  "split": "train",
+  "pinned_revision": "475dd5e8703bb5fb22dd3c60b5d038b019eba1e0",
+  "revision_observed_on_hub": true,
+  "parquet_path": "data/train-00000-of-00001.parquet",
+  "parquet_sha256": "0e0bf9355f892ad74ae98d4e1c404f39fd6654a8e351ee3e6ab162e4a64cd3ad",
+  "parquet_remote_size_bytes": 449839104,
+  "row_count": 32079,
+  "integrity_policy": {
+    "dataset_viewer_role": "DISCOVERY_OR_CONVENIENCE_ONLY",
+    "dataset_viewer_satisfies_pinned_row_integrity": false,
+    "strong_path": "Resolve parquet at the pinned dataset revision, verify the parquet SHA-256, then extract candidate rows locally and quarantine them.",
+    "admission_requires_strong_path": true
+  },
+  "status": "REMOTE_REVISION_AND_PARQUET_IDENTITY_RECORDED_FULL_ROWS_NOT_YET_MATERIALIZED",
+  "treatment_execution": "NOT_EXECUTED",
+  "holdout_access": "NONE"
+}
