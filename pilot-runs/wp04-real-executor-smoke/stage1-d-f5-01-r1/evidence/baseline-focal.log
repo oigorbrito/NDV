@@ -1,0 +1,11 @@
+{
+  "checks": {
+    "canonical_loader_defined": false,
+    "doctor_precedes_persistence_wiring": false,
+    "doctor_reuses_loader": false,
+    "mission_cli_reuses_loader": false,
+    "runtime_entrypoint_reuses_loader": false
+  },
+  "schema_id": "ndv-d-f5-01-structural-verifier-v1",
+  "status": "FAIL"
+}

@@ -1,0 +1,13 @@
+Obtaining file:///D:/projetos/ndv/.ndv-runs/wp04-stage1-d-f5-01-r1/workspace
+  Checking if build backend supports build_editable: started
+  Checking if build backend supports build_editable: finished with status 'done'
+  Preparing editable metadata (pyproject.toml): started
+  Preparing editable metadata (pyproject.toml): finished with status 'done'
+Building wheels for collected packages: metao-control-plane
+  Building editable for metao-control-plane (pyproject.toml): started
+  Building editable for metao-control-plane (pyproject.toml): finished with status 'done'
+  Created wheel for metao-control-plane: filename=metao_control_plane-0.1.0-0.editable-py3-none-any.whl size=1666 sha256=340e0f1f594496cf37649fc809674702f0e01ee0e924949e6814f4b6905892f2
+  Stored in directory: C:\Users\igorb\AppData\Local\Temp\pip-ephem-wheel-cache-vp_r398j\wheels\64\74\0b\6ba845adc499f5f11df0c242ee6122ced3edd69e15681046ad
+Successfully built metao-control-plane
+Installing collected packages: metao-control-plane
+Successfully installed metao-control-plane-0.1.0

@@ -1,0 +1,80 @@
+{
+  "accounting": {
+    "executor_wall_seconds": 202.62882949999766,
+    "failure_resources_retained": true,
+    "monetary_cost": "LOCAL_COST_NOT_CONVERTED_TO_TOKENS",
+    "token_usage": "EXPLICIT_MISSINGNESS_UNLESS_PRESENT_IN_EXECUTOR_LOG"
+  },
+  "base_sha": "9cc5d6d722d509175a669624c9235156dffb4f85",
+  "baseline_gate": {
+    "preservation_returncode": 0,
+    "structural_focal_expected_fail_returncode": 2
+  },
+  "binding_id": "WP04-AIDER-OLLAMA-bcf636703b1a2973",
+  "binding_ref": ".ndv-probes\\bindings\\wp04-aider-qwen25-coder-3b-v2.json",
+  "candidate": {
+    "diff_bytes": 0,
+    "diff_ref": "evidence/candidate.diff",
+    "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "completed_at": "2026-09-16T19:22:34.227112+00:00",
+  "escalation_count": 0,
+  "executor": {
+    "argv_redacted_task": [
+      "C:\\Users\\igorb\\.local\\bin\\aider.exe",
+      "--model",
+      "ollama_chat/qwen2.5-coder:3b",
+      "--message",
+      "<FROZEN_RAW_TASK>",
+      "..."
+    ],
+    "log_ref": "evidence/executor.log",
+    "returncode": 0,
+    "timed_out": false,
+    "wall_seconds": 202.62882949999766
+  },
+  "executor_identity": "aider(aider 0.86.2)+qwen2.5-coder:3b",
+  "failure_attribution": "PRODUCT_FAILURE",
+  "holdout_access": "NONE",
+  "materialization": {
+    "exact_sha_fetched": "9cc5d6d722d509175a669624c9235156dffb4f85",
+    "network_used_before_task_exposure": true,
+    "origin": "https://github.com/oigorbrito/metaO.git",
+    "task_exposed_during_materialization": false
+  },
+  "outcome": "SMOKE_VALID_FAILED",
+  "retry_count": 0,
+  "schema_id": "ndv-wp04-stage1-run-v1",
+  "stage2_release": "YES",
+  "started_at": "2026-09-16T19:18:46.354592+00:00",
+  "task_id": "D-F5-01",
+  "task_statement_sha256": "e455329fee0eb9f9191ba40383a6c2d5cd04f64ea6e262944a1e063fef3a598f",
+  "verification": {
+    "focal": {
+      "kind": "EXTERNAL_REQUIREMENT_STRUCTURAL",
+      "log_ref": "evidence/candidate-focal.log",
+      "returncode": 2
+    },
+    "preservation": {
+      "argv": [
+        "D:\\projetos\\ndv\\.ndv-runs\\wp04-stage1-d-f5-01-r1\\verifier-venv\\Scripts\\python.exe",
+        "-B",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tests/unit"
+      ],
+      "log_ref": "evidence/candidate-preservation.log",
+      "returncode": 0
+    }
+  },
+  "verifier_environment": {
+    "bootstrap_network_allowed_pre_exposure": true,
+    "contract_ref": "experiments\\p1\\wp04-stage1-verifier-env-v1.json",
+    "editable_install_network": "OFFLINE_NO_INDEX",
+    "pinned_pip": "26.2.1",
+    "pinned_setuptools": "84.0.0",
+    "python": "3.13.15"
+  }
+}

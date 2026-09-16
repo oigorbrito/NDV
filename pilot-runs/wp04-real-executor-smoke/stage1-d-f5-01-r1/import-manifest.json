@@ -1,0 +1,27 @@
+{
+  "binding_id": "WP04-AIDER-OLLAMA-bcf636703b1a2973",
+  "candidate_diff_bytes": 0,
+  "candidate_diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "escalation_count": 0,
+  "executor_wall_seconds": 202.62882949999766,
+  "failure_attribution": "PRODUCT_FAILURE",
+  "holdout_access": "NONE",
+  "outcome": "SMOKE_VALID_FAILED",
+  "raw_bundle_preserved": true,
+  "retry_count": 0,
+  "schema_id": "ndv-wp04-import-manifest-v1",
+  "source_run_schema": "ndv-wp04-stage1-run-v1",
+  "task_id": "D-F5-01",
+  "token_reconciliation": {
+    "approximate": true,
+    "input_tokens": 27300,
+    "output_tokens": 104,
+    "samples": [
+      "Tokens: 8.3k sent, 81 received",
+      "Tokens: 19k sent, 23 received"
+    ],
+    "source": "AIDER_EXECUTOR_LOG",
+    "total_tokens": 27404
+  },
+  "treatment_reexecuted": false
+}

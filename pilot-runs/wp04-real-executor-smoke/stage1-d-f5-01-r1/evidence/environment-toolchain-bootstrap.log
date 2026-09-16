@@ -1,0 +1,6 @@
+Requirement already satisfied: pip==26.2.1 in .\.ndv-runs\wp04-stage1-d-f5-01-r1\verifier-venv\Lib\site-packages (26.2.1)
+Collecting setuptools==84.0.0
+  Using cached setuptools-84.0.0-py3-none-any.whl.metadata (6.6 kB)
+Using cached setuptools-84.0.0-py3-none-any.whl (818 kB)
+Installing collected packages: setuptools
+Successfully installed setuptools-84.0.0
