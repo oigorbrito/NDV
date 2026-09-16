@@ -14,9 +14,9 @@ ALLOWED_STATUS = {"WAITING_QUARANTINE", "READY_FOR_ENVIRONMENT_AUDIT", "ENVIRONM
 REQUIRED_PASS_FIELDS = {
     "image_digest", "base_run_ref", "base_run_sha256", "oracle_interpretation_ref", "oracle_interpretation_sha256",
     "focal_verifier_ref", "focal_verifier_sha256", "preservation_ref", "preservation_sha256",
-    "verifier_provenance_ref", "verifier_provenance_sha256", "environment_ref", "harness_integrity",
+    "verifier_provenance_ref", "verifier_provenance_sha256", "environment_ref", "environment_sha256", "harness_integrity",
 }
-HASH_FIELDS = {"base_run_sha256", "oracle_interpretation_sha256", "focal_verifier_sha256", "preservation_sha256", "verifier_provenance_sha256"}
+HASH_FIELDS = {"base_run_sha256", "oracle_interpretation_sha256", "focal_verifier_sha256", "preservation_sha256", "verifier_provenance_sha256", "environment_sha256"}
 
 
 def load(path: Path) -> Any:
@@ -24,44 +24,27 @@ def load(path: Path) -> Any:
 
 
 def validate_record(rec: dict[str, Any], idx: int) -> list[str]:
-    errors: list[str] = []
-    p = f"audit[{idx}]"
-    status = rec.get("status")
-    if status not in ALLOWED_STATUS:
-        errors.append(f"{p} invalid status: {status!r}")
-    if rec.get("treatment_execution") != "NOT_EXECUTED":
-        errors.append(f"{p} treatment_execution must remain NOT_EXECUTED")
-    if rec.get("gold_patch_applied_in_base_mode") is True:
-        errors.append(f"{p} gold patch must never be applied in base mode")
-    if rec.get("test_patch_applied_in_base_mode") is True:
-        errors.append(f"{p} test patch must never be applied in base mode")
-    if status in {"READY_FOR_ENVIRONMENT_AUDIT", "AUDIT_PASS"} and rec.get("quarantine_status") != "PASS":
-        errors.append(f"{p} {status} requires quarantine_status=PASS")
+    errors: list[str] = []; p = f"audit[{idx}]"; status = rec.get("status")
+    if status not in ALLOWED_STATUS: errors.append(f"{p} invalid status: {status!r}")
+    if rec.get("treatment_execution") != "NOT_EXECUTED": errors.append(f"{p} treatment_execution must remain NOT_EXECUTED")
+    if rec.get("gold_patch_applied_in_base_mode") is True: errors.append(f"{p} gold patch must never be applied in base mode")
+    if rec.get("test_patch_applied_in_base_mode") is True: errors.append(f"{p} test patch must never be applied in base mode")
+    if status in {"READY_FOR_ENVIRONMENT_AUDIT", "AUDIT_PASS"} and rec.get("quarantine_status") != "PASS": errors.append(f"{p} {status} requires quarantine_status=PASS")
     if status == "AUDIT_PASS":
         for field in sorted(REQUIRED_PASS_FIELDS):
-            if rec.get(field) in (None, "", "UNRESOLVED"):
-                errors.append(f"{p} AUDIT_PASS requires {field}")
+            if rec.get(field) in (None, "", "UNRESOLVED"): errors.append(f"{p} AUDIT_PASS requires {field}")
         digest = rec.get("image_digest")
-        if not isinstance(digest, str) or not DIGEST.fullmatch(digest):
-            errors.append(f"{p} image_digest must be sha256:<64-hex>")
+        if not isinstance(digest, str) or not DIGEST.fullmatch(digest): errors.append(f"{p} image_digest must be sha256:<64-hex>")
         for field in sorted(HASH_FIELDS):
             value = rec.get(field)
-            if not isinstance(value, str) or not SHA256.fullmatch(value):
-                errors.append(f"{p} {field} must be 64-hex")
-        if rec.get("harness_integrity") != "PASS":
-            errors.append(f"{p} AUDIT_PASS requires harness_integrity=PASS")
-        if rec.get("oracle_classification") != "EXPECTED_BASE_BEHAVIOR":
-            errors.append(f"{p} AUDIT_PASS requires oracle_classification=EXPECTED_BASE_BEHAVIOR")
-        if rec.get("verifier_independent") is not True:
-            errors.append(f"{p} AUDIT_PASS requires verifier_independent=true")
-        if rec.get("base_behavior_matches_expected") is not True:
-            errors.append(f"{p} AUDIT_PASS requires base_behavior_matches_expected=true")
-        if rec.get("preservation_baseline_pass") is not True:
-            errors.append(f"{p} AUDIT_PASS requires preservation_baseline_pass=true")
-        if rec.get("gold_patch_applied_in_base_mode") is not False:
-            errors.append(f"{p} AUDIT_PASS requires gold_patch_applied_in_base_mode=false")
-        if rec.get("test_patch_applied_in_base_mode") is not False:
-            errors.append(f"{p} AUDIT_PASS requires test_patch_applied_in_base_mode=false")
+            if not isinstance(value, str) or not SHA256.fullmatch(value): errors.append(f"{p} {field} must be 64-hex")
+        if rec.get("harness_integrity") != "PASS": errors.append(f"{p} AUDIT_PASS requires harness_integrity=PASS")
+        if rec.get("oracle_classification") != "EXPECTED_BASE_BEHAVIOR": errors.append(f"{p} AUDIT_PASS requires oracle_classification=EXPECTED_BASE_BEHAVIOR")
+        if rec.get("verifier_independent") is not True: errors.append(f"{p} AUDIT_PASS requires verifier_independent=true")
+        if rec.get("base_behavior_matches_expected") is not True: errors.append(f"{p} AUDIT_PASS requires base_behavior_matches_expected=true")
+        if rec.get("preservation_baseline_pass") is not True: errors.append(f"{p} AUDIT_PASS requires preservation_baseline_pass=true")
+        if rec.get("gold_patch_applied_in_base_mode") is not False: errors.append(f"{p} AUDIT_PASS requires gold_patch_applied_in_base_mode=false")
+        if rec.get("test_patch_applied_in_base_mode") is not False: errors.append(f"{p} AUDIT_PASS requires test_patch_applied_in_base_mode=false")
     return errors
 
 
@@ -70,8 +53,7 @@ def validate(payload: dict[str, Any]) -> list[str]:
     if payload.get("schema_id") != "ndv-p1-s2-audit-state-v1": errors.append("unexpected schema_id")
     if payload.get("holdout_access") != "NONE": errors.append("holdout_access must remain NONE")
     audits = payload.get("audits")
-    if not isinstance(audits, list) or not audits:
-        errors.append("audits must be a non-empty array"); return errors
+    if not isinstance(audits, list) or not audits: errors.append("audits must be a non-empty array"); return errors
     seen: set[str] = set()
     for idx, rec in enumerate(audits):
         if not isinstance(rec, dict): errors.append(f"audit[{idx}] must be an object"); continue
@@ -90,5 +72,4 @@ def main() -> int:
     errors = validate(payload); print(json.dumps({"status": "PASS" if not errors else "FAIL", "errors": errors}, indent=2)); return 0 if not errors else 2
 
 
-if __name__ == "__main__":
-    raise SystemExit(main())
+if __name__ == "__main__": raise SystemExit(main())
