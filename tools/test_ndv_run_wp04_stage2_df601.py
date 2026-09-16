@@ -109,6 +109,44 @@ class Stage2GateTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "version mismatch"):
             mod.validate_aider_version("aider.exe", binding)
 
+    def ollama_binding(self, digest: str = "a" * 64):
+        return {
+            "model": {
+                "endpoint": "http://127.0.0.1:11434",
+                "identity": "qwen2.5-coder:3b",
+                "digest_or_exact_version": digest,
+            }
+        }
+
+    @mock.patch.object(mod.urllib.request, "urlopen")
+    def test_ollama_model_name_and_digest_must_match_binding(self, urlopen_mock):
+        class Response:
+            def __enter__(self): return self
+            def __exit__(self, *args): return False
+            def read(self):
+                return json.dumps({"models": [{"name": "qwen2.5-coder:3b", "digest": "a" * 64}]}).encode()
+        urlopen_mock.return_value = Response()
+        observed = mod.validate_ollama_model(self.ollama_binding())
+        self.assertEqual(observed["digest"], "a" * 64)
+        with self.assertRaisesRegex(ValueError, "digest mismatch"):
+            mod.validate_ollama_model(self.ollama_binding("b" * 64))
+
+    @mock.patch.object(mod.urllib.request, "urlopen")
+    def test_ollama_model_must_exist_exactly_once(self, urlopen_mock):
+        class Response:
+            def __enter__(self): return self
+            def __exit__(self, *args): return False
+            def read(self): return json.dumps({"models": []}).encode()
+        urlopen_mock.return_value = Response()
+        with self.assertRaisesRegex(ValueError, "exactly one installed model"):
+            mod.validate_ollama_model(self.ollama_binding())
+
+    def test_ollama_endpoint_must_remain_frozen_local_endpoint(self):
+        binding = self.ollama_binding()
+        binding["model"]["endpoint"] = "http://localhost:11434"
+        with self.assertRaisesRegex(ValueError, "unexpected frozen Ollama endpoint"):
+            mod.validate_ollama_model(binding)
+
 
 if __name__ == "__main__":
     unittest.main()
