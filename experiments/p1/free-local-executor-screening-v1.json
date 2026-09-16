@@ -1,0 +1,85 @@
+{
+  "schema_id": "ndv-p1-free-local-executor-screening-v1",
+  "purpose": "Prospective screening of free or local executor surfaces without making comparative treatment claims.",
+  "status": "ACTIVE_SCREENING",
+  "rules": [
+    "FREE != ZERO COST",
+    "No candidate is a P1 treatment until it passes the executor screening contract.",
+    "Hosted free routers with dynamic model selection are exploration-only unless exact model identity is pinned and observed.",
+    "Local candidates must record runtime version, model digest, quantization, hardware identity, warm/cold state, wall time, and token telemetry where available.",
+    "No automatic model download is performed by the screening probe.",
+    "No credential value may be printed or persisted."
+  ],
+  "hosted_free_candidates": [
+    {
+      "candidate_id": "HF-NEX-N2.5-PRO",
+      "provider": "OpenRouter",
+      "model_id": "nex-agi/nex-n2.5-pro:free",
+      "role": "hosted-free coding/agentic candidate",
+      "screening_status": "DISCOVERED_NOT_QUALIFIED"
+    },
+    {
+      "candidate_id": "HF-NEX-N2.5-MINI",
+      "provider": "OpenRouter",
+      "model_id": "nex-agi/nex-n2.5-mini:free",
+      "role": "hosted-free coding/agentic candidate",
+      "screening_status": "DISCOVERED_NOT_QUALIFIED"
+    },
+    {
+      "candidate_id": "HF-NEMOTRON-3-ULTRA",
+      "provider": "OpenRouter",
+      "model_id": "nvidia/nemotron-3-ultra-550b-a55b:free",
+      "role": "hosted-free reasoning/coding candidate",
+      "screening_status": "DISCOVERED_NOT_QUALIFIED"
+    },
+    {
+      "candidate_id": "HF-NORTH-MINI-CODE",
+      "provider": "OpenRouter",
+      "model_id": "cohere/north-mini-code:free",
+      "role": "hosted-free coding-specialized candidate",
+      "screening_status": "DISCOVERED_NOT_QUALIFIED"
+    }
+  ],
+  "local_candidates": [
+    {
+      "candidate_id": "LOCAL-OLLAMA-INSTALLED",
+      "provider": "Ollama local runtime",
+      "model_id": "DISCOVER_FROM_LOCAL_RUNTIME",
+      "role": "credential-free local candidate",
+      "screening_status": "PROBE_MACHINE_FIRST"
+    },
+    {
+      "candidate_id": "LOCAL-GRANITE-CODE-3B",
+      "provider": "Ollama local runtime",
+      "model_id": "granite-code:3b",
+      "role": "low-resource code-model fallback",
+      "screening_status": "DO_NOT_DOWNLOAD_UNTIL_MACHINE_FIT_CONFIRMED"
+    },
+    {
+      "candidate_id": "LOCAL-GRANITE-CODE-8B",
+      "provider": "Ollama local runtime",
+      "model_id": "granite-code:8b",
+      "role": "local code-model candidate",
+      "screening_status": "DO_NOT_DOWNLOAD_UNTIL_MACHINE_FIT_CONFIRMED"
+    }
+  ],
+  "explicit_exclusions": [
+    {
+      "surface": "openrouter/free",
+      "reason": "dynamic model routing prevents treatment identity from being sufficiently frozen for comparative evidence"
+    },
+    {
+      "surface": "glm-5.3-flash:cloud via Ollama",
+      "reason": "hosted cloud surface, not a credential-free local model"
+    }
+  ],
+  "qualification_outcomes": [
+    "S0_READY",
+    "S0_READY_TELEMETRY_LIMITED",
+    "S0_CREDENTIAL_BLOCKED",
+    "S0_DOWNLOAD_REQUIRED",
+    "S0_ENVIRONMENT_BLOCKED",
+    "S0_NOT_A_STANDALONE_EXECUTOR",
+    "S0_FAIL"
+  ]
+}
