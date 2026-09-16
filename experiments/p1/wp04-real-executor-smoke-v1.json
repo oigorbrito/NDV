@@ -32,13 +32,17 @@
   },
   "executor_binding_policy": {
     "provider_neutral": true,
-    "rule": "The campaign is provider-neutral at design time, but every executed run MUST bind one concrete qualified executor surface before task exposure.",
+    "binding_contract": "experiments/p1/wp04-executor-binding-v2.template.json",
+    "rule": "The campaign is provider-neutral at design time, but every executed run MUST bind one concrete qualified software executor. A raw model endpoint is insufficient unless paired with a frozen repository-capable execution scaffold.",
     "required_before_execution": [
       "binding_id",
       "surface_class",
+      "executor_kind",
       "provider_or_runtime",
       "exact_executor_identity",
       "version_or_model_hash",
+      "scaffold",
+      "model",
       "invocation_command_or_surface",
       "telemetry_mode",
       "candidate_capture_mode",
@@ -51,6 +55,10 @@
       "HOSTED_FREE_PINNED",
       "SUBSCRIPTION_EXECUTOR_PINNED"
     ],
+    "allowed_executor_kinds": [
+      "STANDALONE_AGENT",
+      "MODEL_PLUS_FROZEN_SCAFFOLD"
+    ],
     "dynamic_or_random_routing": "FORBIDDEN",
     "automatic_download": "FORBIDDEN",
     "implicit_fallback": "FORBIDDEN"
@@ -62,6 +70,7 @@
       "family": "F5",
       "repository": "oigorbrito/metaO",
       "base_sha": "9cc5d6d722d509175a669624c9235156dffb4f85",
+      "task_statement_source": "oigorbrito/metaO issue #400 plus frozen historical corpus construct",
       "oracle_ref": "oigorbrito/dv@66f3a218fba800daed5d86fdfce386491b8ab0e8:pilot-runs/block-4ah-offline-oracle-closure/run-specs/D-F5-01-oracle.json",
       "focal_command": ["python", "-m", "unittest", "tests.unit.test_operator_ux_doctor"],
       "preservation_command": ["python", "-m", "unittest", "discover", "-s", "tests/unit"],
