@@ -25,9 +25,19 @@ REQUIRED_PASS_FIELDS = {
     "oracle_interpretation_ref",
     "oracle_interpretation_sha256",
     "focal_verifier_ref",
+    "focal_verifier_sha256",
     "preservation_ref",
+    "preservation_sha256",
     "verifier_provenance_ref",
+    "verifier_provenance_sha256",
     "environment_ref",
+}
+HASH_FIELDS = {
+    "base_run_sha256",
+    "oracle_interpretation_sha256",
+    "focal_verifier_sha256",
+    "preservation_sha256",
+    "verifier_provenance_sha256",
 }
 
 
@@ -54,7 +64,7 @@ def validate_record(rec: dict[str, Any], idx: int) -> list[str]:
         digest = rec.get("image_digest")
         if not isinstance(digest, str) or not DIGEST.fullmatch(digest):
             errors.append(f"{p} image_digest must be sha256:<64-hex>")
-        for field in ("base_run_sha256", "oracle_interpretation_sha256"):
+        for field in sorted(HASH_FIELDS):
             value = rec.get(field)
             if not isinstance(value, str) or not SHA256.fullmatch(value):
                 errors.append(f"{p} {field} must be 64-hex")
