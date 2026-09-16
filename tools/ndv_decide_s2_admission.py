@@ -10,7 +10,7 @@ from typing import Any
 
 SHA256 = re.compile(r"^[0-9a-f]{64}$")
 DIGEST = re.compile(r"^sha256:[0-9a-f]{64}$")
-AUDIT_HASH_FIELDS = ("base_run_sha256", "oracle_interpretation_sha256", "focal_verifier_sha256", "preservation_sha256", "verifier_provenance_sha256")
+AUDIT_HASH_FIELDS = ("base_run_sha256", "oracle_interpretation_sha256", "focal_verifier_sha256", "preservation_sha256", "verifier_provenance_sha256", "environment_sha256")
 AUDIT_REF_FIELDS = ("base_run_ref", "oracle_interpretation_ref", "focal_verifier_ref", "preservation_ref", "verifier_provenance_ref", "environment_ref")
 
 
@@ -45,6 +45,7 @@ def decide_candidate(candidate: dict[str, Any], audit: dict[str, Any] | None) ->
         blockers.append("AUDIT_RECORD_MISSING")
     else:
         if audit.get("status") != "AUDIT_PASS": blockers.append(f"AUDIT_STATUS_{audit.get('status', 'MISSING')}")
+        if audit.get("quarantine_status") != "PASS": blockers.append("AUDIT_QUARANTINE_NOT_PASS")
         if audit.get("harness_integrity") != "PASS": blockers.append("HARNESS_INTEGRITY_NOT_PASS")
         if audit.get("oracle_classification") != "EXPECTED_BASE_BEHAVIOR": blockers.append("BASE_ORACLE_NOT_EXPECTED")
         if audit.get("base_behavior_matches_expected") is not True: blockers.append("BASE_BEHAVIOR_NOT_CONFIRMED")
@@ -69,6 +70,10 @@ def decide_candidate(candidate: dict[str, Any], audit: dict[str, Any] | None) ->
             "focal_verifier_ref": None if audit is None else audit.get("focal_verifier_ref"), "preservation_ref": None if audit is None else audit.get("preservation_ref"),
             "verifier_provenance_ref": None if audit is None else audit.get("verifier_provenance_ref"), "environment_ref": None if audit is None else audit.get("environment_ref"),
         },
+        "evidence_hashes": {
+            "ndv_canonical_row_sha256": candidate.get("ndv_canonical_row_sha256"), "executor_visible_sha256": candidate.get("executor_visible_sha256"), "task_statement_sha256": candidate.get("task_statement_sha256"),
+            **({} if audit is None else {field: audit.get(field) for field in AUDIT_HASH_FIELDS}),
+        },
     }
 
 
@@ -85,5 +90,4 @@ def main() -> int:
     result = decide(load(args.wave), load(args.audit)); args.out.parent.mkdir(parents=True, exist_ok=True); args.out.write_text(json.dumps(result, indent=2, sort_keys=True) + "\n", encoding="utf-8"); print(json.dumps(result["summary"], indent=2, sort_keys=True)); return 0
 
 
-if __name__ == "__main__":
-    raise SystemExit(main())
+if __name__ == "__main__": raise SystemExit(main())
