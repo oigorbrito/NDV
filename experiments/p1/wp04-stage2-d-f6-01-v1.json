@@ -1,0 +1,32 @@
+{
+  "schema_id": "ndv-p1-wp04-stage2-task-v1",
+  "task_id": "D-F6-01",
+  "family": "F6",
+  "repository": "oigorbrito/metaO",
+  "base_sha": "5d00cd284ce8fe810b0f5192c56d98608be516d4",
+  "source_pr": "oigorbrito/metaO#451",
+  "task_statement_mode": "S0_RAW_TASK_RECONSTRUCTED_FROM_PRE_SOLUTION_REQUIREMENT",
+  "task_statement": "Harden the Rust qualification test harness for two issues without changing production runtime or persistence behavior: make discovery persistence temporary stores safe under parallel test execution, and make the phase6 shadow runtime-binary fallback honor an externally supplied CARGO_TARGET_DIR while preserving CARGO_BIN_EXE_metao-wire-runtime as first authority. Keep changes limited to test/harness code and preserve the locked Rust workspace test suite.",
+  "solution_isolation": {
+    "gold_patch_available_to_executor": false,
+    "solution_head_available_to_executor": false,
+    "historical_pr_diff_available_to_executor": false,
+    "verifier_details_in_prompt": false
+  },
+  "working_directory": "experiments/rust-chassis-a",
+  "historical_oracle": {
+    "ref": "oigorbrito/dv@66f3a218fba800daed5d86fdfce386491b8ab0e8:pilot-runs/block-4ah-offline-oracle-closure/run-specs/D-F6-01-oracle.json",
+    "mandatory_checks": [
+      ["cargo", "test", "--locked", "--workspace", "--test", "discovery_persistence_tests"],
+      ["cargo", "test", "--locked", "--workspace", "--test", "phase6_shadow"],
+      ["cargo", "test", "--locked", "--workspace"]
+    ]
+  },
+  "execution_policy": {
+    "retry_limit": 0,
+    "escalation_limit": 0,
+    "dynamic_routing": false,
+    "implicit_fallback": false,
+    "holdout_access": false
+  }
+}
