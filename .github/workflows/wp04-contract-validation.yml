@@ -20,6 +20,8 @@ on:
       - 'tools/test_ndv_run_wp04_stage2_df601.py'
       - 'tools/ndv_import_wp04_stage_run.py'
       - 'tools/test_ndv_import_wp04_stage_run.py'
+      - 'tools/ndv_close_wp04_campaign.py'
+      - 'tools/test_ndv_close_wp04_campaign.py'
       - '.github/workflows/wp04-contract-validation.yml'
   pull_request:
     paths:
@@ -40,6 +42,8 @@ on:
       - 'tools/test_ndv_run_wp04_stage2_df601.py'
       - 'tools/ndv_import_wp04_stage_run.py'
       - 'tools/test_ndv_import_wp04_stage_run.py'
+      - 'tools/ndv_close_wp04_campaign.py'
+      - 'tools/test_ndv_close_wp04_campaign.py'
       - '.github/workflows/wp04-contract-validation.yml'
   workflow_dispatch:
 
@@ -66,6 +70,7 @@ jobs:
           python -m py_compile tools/ndv_run_wp04_stage1_df501.py
           python -m py_compile tools/ndv_run_wp04_stage2_df601.py
           python -m py_compile tools/ndv_import_wp04_stage_run.py
+          python -m py_compile tools/ndv_close_wp04_campaign.py
 
       - name: Validate frozen campaign
         run: python tools/ndv_validate_wp04_smoke.py
@@ -78,3 +83,4 @@ jobs:
           python -m unittest -v test_ndv_verify_df601_structural.py
           python -m unittest -v test_ndv_import_wp04_stage_run.py
           python -m unittest -v test_ndv_run_wp04_stage2_df601.py
+          python -m unittest -v test_ndv_close_wp04_campaign.py
