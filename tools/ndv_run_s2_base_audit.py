@@ -1,27 +1,36 @@
 #!/usr/bin/env python3
 """Run one S2 pre-solution base audit inside an immutable Docker image.
 
-This utility is admission tooling, not treatment execution. It never applies a
-solution patch. It consumes an admission-only quarantined row, resolves the
-container image to a digest, executes the frozen install_config.test_cmd at the
-repository base state, and records auditable evidence.
+Admission tooling only: no model call, gold patch, test patch, or holdout access.
+The runner cryptographically rebinds the quarantined raw row, verifies exact
+repository HEAD/cleanliness inside the container, executes every frozen test
+command with explicit per-command return-code markers, and persists evidence.
 """
 from __future__ import annotations
 
 import argparse
 import hashlib
 import json
+import re
+import shlex
 import subprocess
 import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-SCHEMA = "ndv-p1-s2-base-audit-run-v1"
+SCHEMA = "ndv-p1-s2-base-audit-run-v2"
+CMD_RC_RE = re.compile(r"^__NDV_CMD_(\d+)_RC__=(\d+)$", re.MULTILINE)
+HEAD_RE = re.compile(r"^__NDV_HEAD__=([0-9a-f]{40})$", re.MULTILINE)
+CLEAN_RE = re.compile(r"^__NDV_CLEAN__=(YES|NO)$", re.MULTILINE)
 
 
 def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def canonical_bytes(value: Any) -> bytes:
+    return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
 
 
 def sha256_bytes(data: bytes) -> str:
@@ -37,6 +46,7 @@ def sha256_file(path: Path) -> str:
 
 
 def write_json(path: Path, obj: Any) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(obj, indent=2, sort_keys=True, ensure_ascii=False) + "\n", encoding="utf-8")
 
 
@@ -67,22 +77,42 @@ def resolve_image_digest(image_ref: str) -> str:
         raise RuntimeError("docker RepoDigests must be a list")
     candidates = sorted(x for x in digests if isinstance(x, str) and "@sha256:" in x)
     if not candidates:
-        raise RuntimeError("image has no immutable RepoDigest; pull or build with digest evidence first")
+        raise RuntimeError("image has no immutable RepoDigest")
     return candidates[0]
+
+
+def unwrap_admission_artifact(artifact: dict[str, Any], candidate: dict[str, Any]) -> dict[str, Any]:
+    if artifact.get("schema_id") != "ndv-p1-s2-admission-only-row-v1":
+        raise ValueError("unexpected admission-only schema")
+    if artifact.get("candidate_id") != candidate.get("candidate_id"):
+        raise ValueError("candidate_id mismatch between admission artifact and wave")
+    row = artifact.get("full_row")
+    source = artifact.get("source")
+    if not isinstance(row, dict) or not isinstance(source, dict):
+        raise ValueError("admission artifact requires full_row and source")
+    expected_raw_sha = source.get("ndv_canonical_row_sha256")
+    actual_raw_sha = sha256_bytes(canonical_bytes(row))
+    if expected_raw_sha != actual_raw_sha:
+        raise ValueError("admission full_row hash mismatch")
+    if source.get("source_instance_id") != candidate.get("source_instance_id"):
+        raise ValueError("source_instance_id mismatch in admission binding")
+    if source.get("source_row_index") != candidate.get("source_row_index"):
+        raise ValueError("source_row_index mismatch in admission binding")
+    return row
 
 
 def validate_row(row: dict[str, Any], candidate: dict[str, Any]) -> tuple[list[str], str, str, list[str], str | None]:
     errors: list[str] = []
     if row.get("instance_id") != candidate.get("source_instance_id"):
-        errors.append("instance_id mismatch between admission-only row and candidate")
+        errors.append("instance_id mismatch")
     if row.get("repo") != candidate.get("repository"):
-        errors.append("repo mismatch between admission-only row and candidate")
+        errors.append("repo mismatch")
     if row.get("base_commit") != candidate.get("base_revision"):
-        errors.append("base_commit mismatch between admission-only row and candidate")
+        errors.append("base_commit mismatch")
 
     install = row.get("install_config")
     if not isinstance(install, dict):
-        errors.append("admission-only row missing install_config")
+        errors.append("full row missing install_config")
         install = {}
     try:
         commands = normalize_commands(install.get("test_cmd"))
@@ -91,7 +121,7 @@ def validate_row(row: dict[str, Any], candidate: dict[str, Any]) -> tuple[list[s
         commands = []
     parser_name = install.get("log_parser") if isinstance(install.get("log_parser"), str) else None
     if not parser_name:
-        errors.append("admission-only row missing install_config.log_parser")
+        errors.append("full row missing install_config.log_parser")
 
     image_ref = candidate.get("image_ref")
     if not isinstance(image_ref, str) or not image_ref:
@@ -104,39 +134,50 @@ def validate_row(row: dict[str, Any], candidate: dict[str, Any]) -> tuple[list[s
     return errors, image_ref, workdir, commands, parser_name
 
 
-def execute_base(image_digest: str, workdir: str, commands: list[str], timeout: float) -> dict[str, Any]:
-    script = "\n".join([
+def build_script(base_revision: str, commands: list[str]) -> str:
+    lines = [
         "set +e",
-        "git reset --hard HEAD",
-        "git status --porcelain=v1",
-        *commands,
-    ])
-    argv = [
-        "docker", "run", "--rm",
-        "--network", "none",
-        "-w", workdir,
-        image_digest,
-        "/bin/bash", "-lc", script,
+        "observed_head=$(git rev-parse HEAD 2>/dev/null)",
+        'printf "__NDV_HEAD__=%s\\n" "$observed_head"',
+        f"if [ \"$observed_head\" != {shlex.quote(base_revision)} ]; then exit 90; fi",
+        "if [ -z \"$(git status --porcelain=v1)\" ]; then echo __NDV_CLEAN__=YES; else echo __NDV_CLEAN__=NO; exit 91; fi",
+        "overall=0",
     ]
+    for idx, command in enumerate(commands, 1):
+        lines.extend([
+            f"eval {shlex.quote(command)}",
+            "rc=$?",
+            f'printf "__NDV_CMD_{idx}_RC__=%s\\n" "$rc"',
+            'if [ "$rc" -ne 0 ]; then overall=1; fi',
+        ])
+    lines.append('exit "$overall"')
+    return "\n".join(lines)
+
+
+def parse_execution_markers(stdout: str, expected_command_count: int) -> dict[str, Any]:
+    head = HEAD_RE.search(stdout)
+    clean = CLEAN_RE.search(stdout)
+    observed = {int(i): int(rc) for i, rc in CMD_RC_RE.findall(stdout)}
+    return {
+        "observed_head": head.group(1) if head else None,
+        "clean_before_tests": clean.group(1) == "YES" if clean else None,
+        "command_returncodes": [observed.get(i) for i in range(1, expected_command_count + 1)],
+        "all_command_markers_present": set(observed) == set(range(1, expected_command_count + 1)),
+    }
+
+
+def execute_base(image_digest: str, workdir: str, base_revision: str, commands: list[str], timeout: float) -> dict[str, Any]:
+    script = build_script(base_revision, commands)
+    argv = ["docker", "run", "--rm", "--network", "none", "-w", workdir, image_digest, "/bin/bash", "-lc", script]
     started = time.monotonic()
     try:
         proc = run(argv, timeout=timeout)
-        timed_out = False
-        returncode = proc.returncode
-        stdout, stderr = proc.stdout, proc.stderr
+        timed_out, returncode, stdout, stderr = False, proc.returncode, proc.stdout, proc.stderr
     except subprocess.TimeoutExpired as exc:
-        timed_out = True
-        returncode = 124
-        stdout = exc.stdout or ""
-        stderr = (exc.stderr or "") + f"\ntimeout after {timeout} seconds\n"
-    return {
-        "argv": argv,
-        "returncode": returncode,
-        "timed_out": timed_out,
-        "duration_seconds": time.monotonic() - started,
-        "stdout": stdout,
-        "stderr": stderr,
-    }
+        timed_out, returncode = True, 124
+        stdout, stderr = exc.stdout or "", (exc.stderr or "") + f"\ntimeout after {timeout} seconds\n"
+    markers = parse_execution_markers(stdout, len(commands))
+    return {"argv": argv, "script_sha256": sha256_bytes(script.encode()), "returncode": returncode, "timed_out": timed_out, "duration_seconds": time.monotonic() - started, "markers": markers, "stdout": stdout, "stderr": stderr}
 
 
 def main() -> int:
@@ -149,13 +190,16 @@ def main() -> int:
     args = ap.parse_args()
 
     wave = json.loads(args.wave.read_text(encoding="utf-8"))
-    row = json.loads(args.admission_row.read_text(encoding="utf-8"))
-    if not isinstance(row, dict):
-        raise SystemExit("admission row must be a JSON object")
+    artifact = json.loads(args.admission_row.read_text(encoding="utf-8"))
     candidates = [c for c in wave.get("candidates", []) if c.get("candidate_id") == args.candidate_id]
     if len(candidates) != 1:
         raise SystemExit("candidate-id must resolve to exactly one wave candidate")
     candidate = candidates[0]
+    try:
+        row = unwrap_admission_artifact(artifact, candidate)
+    except ValueError as exc:
+        print(json.dumps({"status": "FAIL", "errors": [str(exc)]}, indent=2))
+        return 2
 
     errors, image_ref, workdir, commands, parser_name = validate_row(row, candidate)
     if errors:
@@ -166,60 +210,40 @@ def main() -> int:
     try:
         image_digest = resolve_image_digest(image_ref)
     except (OSError, RuntimeError, subprocess.TimeoutExpired) as exc:
-        report = {
-            "schema_id": SCHEMA,
-            "candidate_id": args.candidate_id,
-            "status": "ENVIRONMENT_BLOCKED",
-            "reason": str(exc),
-            "image_ref": image_ref,
-            "gold_patch_applied": False,
-            "test_patch_applied": False,
-            "observed_at": utc_now(),
-        }
+        report = {"schema_id": SCHEMA, "candidate_id": args.candidate_id, "status": "ENVIRONMENT_BLOCKED", "reason": str(exc), "image_ref": image_ref, "gold_patch_applied": False, "test_patch_applied": False, "observed_at": utc_now()}
         write_json(args.out / "base-audit-run.json", report)
         print(json.dumps(report, indent=2, sort_keys=True))
         return 3
 
-    result = execute_base(image_digest, workdir, commands, args.timeout_seconds)
-    stdout_path = args.out / "base.stdout.log"
-    stderr_path = args.out / "base.stderr.log"
+    result = execute_base(image_digest, workdir, candidate["base_revision"], commands, args.timeout_seconds)
+    stdout_path, stderr_path = args.out / "base.stdout.log", args.out / "base.stderr.log"
     stdout_path.write_text(result.pop("stdout"), encoding="utf-8")
     stderr_path.write_text(result.pop("stderr"), encoding="utf-8")
 
-    admission_sha = sha256_file(args.admission_row)
+    markers = result["markers"]
+    harness_integrity = (
+        markers["observed_head"] == candidate["base_revision"]
+        and markers["clean_before_tests"] is True
+        and markers["all_command_markers_present"]
+    )
     report = {
-        "schema_id": SCHEMA,
-        "candidate_id": args.candidate_id,
-        "source_instance_id": candidate["source_instance_id"],
-        "repository": candidate["repository"],
-        "base_revision": candidate["base_revision"],
-        "admission_row_ref": str(args.admission_row),
-        "admission_row_file_sha256": admission_sha,
-        "image_ref": image_ref,
-        "image_digest": image_digest,
-        "runtime": "docker",
-        "network": "none",
-        "workdir": workdir,
-        "test_commands": commands,
-        "test_commands_sha256": sha256_bytes(json.dumps(commands, sort_keys=True, separators=(",", ":")).encode()),
-        "log_parser_name": parser_name,
-        "gold_patch_applied": False,
-        "test_patch_applied": False,
-        "process": result,
-        "evidence": {
-            "stdout_ref": str(stdout_path),
-            "stdout_sha256": sha256_file(stdout_path),
-            "stderr_ref": str(stderr_path),
-            "stderr_sha256": sha256_file(stderr_path),
-        },
-        "observed_at": utc_now(),
-        "classification": "BASE_RUN_RECORDED",
-        "note": "A nonzero test exit is not automatically an infrastructure failure; oracle interpretation is a separate audit step.",
+        "schema_id": SCHEMA, "candidate_id": args.candidate_id, "source_instance_id": candidate["source_instance_id"],
+        "repository": candidate["repository"], "base_revision": candidate["base_revision"],
+        "admission_row_ref": str(args.admission_row), "admission_row_file_sha256": sha256_file(args.admission_row),
+        "admission_full_row_sha256": sha256_bytes(canonical_bytes(row)), "image_ref": image_ref, "image_digest": image_digest,
+        "runtime": "docker", "network": "none", "workdir": workdir, "test_commands": commands,
+        "test_commands_sha256": sha256_bytes(canonical_bytes(commands)), "log_parser_name": parser_name,
+        "gold_patch_applied": False, "test_patch_applied": False, "process": result,
+        "harness_integrity": "PASS" if harness_integrity else "FAIL",
+        "evidence": {"stdout_ref": str(stdout_path), "stdout_sha256": sha256_file(stdout_path), "stderr_ref": str(stderr_path), "stderr_sha256": sha256_file(stderr_path)},
+        "observed_at": utc_now(), "classification": "BASE_RUN_RECORDED" if harness_integrity else "HARNESS_INVALID",
+        "note": "Test failures are interpreted separately; missing HEAD/clean/command markers invalidate the harness run.",
+        "treatment_execution": "NOT_EXECUTED", "holdout_access": "NONE",
     }
     report_path = args.out / "base-audit-run.json"
     write_json(report_path, report)
-    print(json.dumps({"status": "PASS", "report": str(report_path), "report_sha256": sha256_file(report_path)}, indent=2))
-    return 0
+    print(json.dumps({"status": "PASS" if harness_integrity else "FAIL", "report": str(report_path), "report_sha256": sha256_file(report_path)}, indent=2))
+    return 0 if harness_integrity else 2
 
 
 if __name__ == "__main__":
