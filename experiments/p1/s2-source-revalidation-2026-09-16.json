@@ -1,0 +1,31 @@
+{
+  "schema_id": "ndv-p1-s2-source-revalidation-v1",
+  "observed_date": "2026-09-16",
+  "purpose": "Corroborate that the frozen public source is still externally resolvable before operator-invoked byte acquisition. This is not local materialization evidence and cannot satisfy the acquisition gate.",
+  "source": {
+    "dataset": "nebius/SWE-rebench-V2",
+    "pinned_revision": "475dd5e8703bb5fb22dd3c60b5d038b019eba1e0",
+    "parquet_path": "data/train-00000-of-00001.parquet",
+    "expected_parquet_sha256": "0e0bf9355f892ad74ae98d4e1c404f39fd6654a8e351ee3e6ab162e4a64cd3ad",
+    "expected_row_count": 32079
+  },
+  "external_observation": {
+    "provider": "Hugging Face",
+    "file_page": "https://huggingface.co/datasets/nebius/SWE-rebench-V2/blob/main/data/train-00000-of-00001.parquet",
+    "dataset_page": "https://huggingface.co/datasets/nebius/SWE-rebench-V2",
+    "displayed_verified_revision_prefix": "475dd5e",
+    "displayed_sha256": "0e0bf9355f892ad74ae98d4e1c404f39fd6654a8e351ee3e6ab162e4a64cd3ad",
+    "displayed_row_count": 32079,
+    "availability": "OBSERVED"
+  },
+  "authority_limits": {
+    "downloaded_bytes_observed": false,
+    "local_size_verified": false,
+    "local_sha256_verified": false,
+    "acquisition_gate_satisfied": false,
+    "candidate_admission_authority": "NONE"
+  },
+  "treatment_execution": "NOT_EXECUTED",
+  "holdout_access": "NONE",
+  "status": "SOURCE_EXTERNALLY_REVALIDATED_ONLY"
+}
