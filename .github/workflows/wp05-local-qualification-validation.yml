@@ -1,0 +1,40 @@
+name: WP-05 Local Qualification Validation
+
+on:
+  push:
+    paths:
+      - 'tools/ndv_local_surface_probe.py'
+      - 'tools/ndv_qualify_local_ollama_executor.py'
+      - 'tools/test_ndv_qualify_local_ollama_executor.py'
+      - 'tools/ndv_validate_wp04_smoke.py'
+      - 'docs/research/WP-05-FREE-LOCAL-EXECUTOR-SCREENING.md'
+      - '.github/workflows/wp05-local-qualification-validation.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout NDV
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Compile qualification tooling
+        run: |
+          python -m py_compile tools/ndv_local_surface_probe.py
+          python -m py_compile tools/ndv_qualify_local_ollama_executor.py
+          python -m py_compile tools/ndv_validate_wp04_smoke.py
+
+      - name: Run local qualification unit tests
+        working-directory: tools
+        run: python -m unittest -v test_ndv_qualify_local_ollama_executor.py
+
+      - name: Revalidate WP-04 static campaign
+        run: python tools/ndv_validate_wp04_smoke.py
