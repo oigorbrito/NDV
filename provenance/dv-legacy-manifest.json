@@ -21,10 +21,25 @@
     "experiments/p1/run-spec-v1.template.json",
     "experiments/p1/run-result-v1.schema.json"
   ],
+  "reused_tool_artifacts": [
+    {
+      "path": "tools/dv_pilot_harness.py",
+      "blob_sha": "0f7f936e46dbaccf243b6b77dd6014eedeb076cf",
+      "role": "inherited measurement harness used by NDV deterministic smoke",
+      "reuse_mode": "REFERENCE_AND_EXECUTE_FROM_LEGACY_CHECKOUT"
+    },
+    {
+      "path": "tools/dv_workspace_materializer.py",
+      "blob_sha": "b7d12a406dd3ff78ac33465cb527b4850d34446a",
+      "role": "candidate inherited workspace materializer for later real-task smoke",
+      "reuse_mode": "REFERENCE_PENDING_WP04"
+    }
+  ],
   "rules": [
     "Historical DV artifacts retain their original names, hashes, repository paths, and meaning.",
     "Prospective work created after cutover uses NDV naming and this repository.",
     "A copied legacy artifact must retain an explicit source repository, source commit, source path, and integrity reference.",
-    "Historical pilot runs must never be relabeled as NDV runs."
+    "Historical pilot runs must never be relabeled as NDV runs.",
+    "Reused historical tools remain historical artifacts; NDV wrappers must not silently change their semantics."
   ]
 }
