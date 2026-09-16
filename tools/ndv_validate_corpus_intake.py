@@ -51,6 +51,8 @@ def validate(payload: dict[str, Any]) -> list[str]:
     missing = FORBIDDEN_AGENT_FIELDS - actual_forbidden
     if missing:
         errors.append(f"quarantine is missing forbidden fields: {sorted(missing)}")
+    if quarantine.get("projection_mode") not in {None, "STRICT_ALLOWLIST"}:
+        errors.append("source_field_quarantine.projection_mode must be STRICT_ALLOWLIST when declared")
 
     source = payload.get("source", {})
     rev = source.get("dataset_revision")
@@ -95,17 +97,32 @@ def validate(payload: dict[str, Any]) -> list[str]:
         if disposition not in ALLOWED_DISPOSITIONS:
             errors.append(f"{prefix} invalid disposition: {disposition!r}")
 
+        qstatus = candidate.get("quarantine_status")
+        if qstatus not in {None, "PENDING", "PASS", "FAIL"}:
+            errors.append(f"{prefix} invalid quarantine_status: {qstatus!r}")
+        for field in ("ndv_canonical_row_sha256", "executor_visible_sha256"):
+            value = candidate.get(field)
+            if value is not None and (not isinstance(value, str) or not SHA256.fullmatch(value)):
+                errors.append(f"{prefix} {field} must be 64-hex when present")
+
         if disposition == "ADMITTED":
             required_admission = {
                 "task_statement_sha256",
                 "focal_verifier_ref",
                 "preservation_ref",
                 "environment_ref",
+                "quarantine_manifest_ref",
+                "admission_only_ref",
+                "executor_visible_ref",
+                "ndv_canonical_row_sha256",
+                "executor_visible_sha256",
             }
             for field in sorted(required_admission):
                 value = candidate.get(field)
                 if value in (None, "", "UNRESOLVED"):
                     errors.append(f"{prefix} ADMITTED requires {field}")
+            if candidate.get("quarantine_status") != "PASS":
+                errors.append(f"{prefix} ADMITTED requires quarantine_status=PASS")
             if candidate.get("verifier_independent") is not True:
                 errors.append(f"{prefix} ADMITTED requires verifier_independent=true")
             if candidate.get("solution_isolation") not in {"PASS", "PROVEN"}:
