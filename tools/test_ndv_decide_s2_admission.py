@@ -12,7 +12,7 @@ class AdmissionDecisionTests(unittest.TestCase):
             "proposed_family": "F1", "solution_isolation": "PROVEN",
         }]}
         audit = {"audits": [{
-            "candidate_id": "c1", "status": "AUDIT_PASS", "harness_integrity": "PASS",
+            "candidate_id": "c1", "status": "AUDIT_PASS", "quarantine_status": "PASS", "harness_integrity": "PASS",
             "oracle_classification": "EXPECTED_BASE_BEHAVIOR", "base_behavior_matches_expected": True,
             "verifier_independent": True, "preservation_baseline_pass": True, "treatment_execution": "NOT_EXECUTED",
             "gold_patch_applied_in_base_mode": False, "test_patch_applied_in_base_mode": False,
@@ -22,18 +22,23 @@ class AdmissionDecisionTests(unittest.TestCase):
             "focal_verifier_ref": "focal.json", "focal_verifier_sha256": "1" * 64,
             "preservation_ref": "preserve.json", "preservation_sha256": "2" * 64,
             "verifier_provenance_ref": "prov.json", "verifier_provenance_sha256": "3" * 64,
-            "environment_ref": "env.json",
+            "environment_ref": "env.json", "environment_sha256": "4" * 64,
         }]}
         return wave, audit
 
     def test_complete_gates_admit(self):
-        result = decide(*self.base())
-        self.assertEqual(result["decisions"][0]["decision"], "ADMIT")
+        result = decide(*self.base()); decision = result["decisions"][0]
+        self.assertEqual(decision["decision"], "ADMIT")
         self.assertEqual(result["summary"]["admit_count"], 1)
+        self.assertEqual(decision["evidence_hashes"]["environment_sha256"], "4" * 64)
 
     def test_missing_quarantine_blocks(self):
         wave, audit = self.base(); wave["candidates"][0]["quarantine_status"] = "PENDING"
         self.assertIn("QUARANTINE_NOT_PASS", decide(wave, audit)["decisions"][0]["blockers"])
+
+    def test_audit_quarantine_must_match(self):
+        wave, audit = self.base(); audit["audits"][0]["quarantine_status"] = "PENDING"
+        self.assertIn("AUDIT_QUARANTINE_NOT_PASS", decide(wave, audit)["decisions"][0]["blockers"])
 
     def test_harness_failure_blocks_even_with_audit_pass_label(self):
         wave, audit = self.base(); audit["audits"][0]["harness_integrity"] = "FAIL"
@@ -55,6 +60,9 @@ class AdmissionDecisionTests(unittest.TestCase):
         wave, audit = self.base(); audit["audits"][0]["base_run_sha256"] = None
         self.assertIn("AUDIT_BASE_RUN_SHA256_INVALID", decide(wave, audit)["decisions"][0]["blockers"])
 
+    def test_missing_environment_hash_blocks_direct_call(self):
+        wave, audit = self.base(); audit["audits"][0]["environment_sha256"] = None
+        self.assertIn("AUDIT_ENVIRONMENT_SHA256_INVALID", decide(wave, audit)["decisions"][0]["blockers"])
 
-if __name__ == "__main__":
-    unittest.main()
+
+if __name__ == "__main__": unittest.main()
