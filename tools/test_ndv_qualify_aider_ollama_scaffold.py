@@ -1,7 +1,15 @@
 import copy
+import tempfile
 import unittest
+from pathlib import Path
 
-from ndv_qualify_aider_ollama_scaffold import diff_is_valid, find_model, make_binding, parse_aider_version
+from ndv_qualify_aider_ollama_scaffold import (
+    diff_is_valid,
+    find_model,
+    make_binding,
+    parse_aider_version,
+    resolve_aider,
+)
 
 
 PROBE = {
@@ -33,9 +41,20 @@ class AiderScaffoldQualificationTests(unittest.TestCase):
     def test_parse_version(self):
         self.assertEqual(parse_aider_version("aider 0.test\n"), "aider 0.test")
 
+    def test_explicit_aider_path(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            exe = Path(tmp) / "aider.exe"
+            exe.write_bytes(b"")
+            self.assertEqual(resolve_aider(exe), str(exe.resolve()))
+
+    def test_missing_explicit_aider_path_fails_closed(self):
+        with self.assertRaises(ValueError):
+            resolve_aider(Path("definitely-missing-aider.exe"))
+
     def test_binding_v2_has_scaffold_and_model(self):
         binding = make_binding(
             aider_version="aider 0.test",
+            aider_executable="C:/Users/test/.local/bin/aider.exe",
             model_name="qwen2.5-coder:3b",
             model_digest="f" * 64,
             evidence_ref="evidence.json",
@@ -47,6 +66,7 @@ class AiderScaffoldQualificationTests(unittest.TestCase):
         self.assertEqual(binding["executor_kind"], "MODEL_PLUS_FROZEN_SCAFFOLD")
         self.assertTrue(binding["scaffold"]["repository_tool_access"])
         self.assertFalse(binding["scaffold"]["dynamic_routing"])
+        self.assertEqual(binding["scaffold"]["executable_path"], "C:/Users/test/.local/bin/aider.exe")
         self.assertEqual(binding["model"]["identity"], "qwen2.5-coder:3b")
         self.assertEqual(binding["retry_limit"], 0)
         self.assertEqual(binding["escalation_limit"], 0)
