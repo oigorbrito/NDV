@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""Qualify one already-installed Ollama model for NDV WP-04 binding."""
+"""Qualify one already-installed Ollama model as an inference endpoint.
+
+This tool intentionally does NOT qualify the endpoint as a standalone software
+executor. A WP-04 executable binding additionally requires a frozen agent
+scaffold with repository inspection/modification capability.
+"""
 from __future__ import annotations
 
 import argparse
@@ -63,48 +68,30 @@ def candidate_is_valid(text: str) -> bool:
     return bool(EXPECTED_DIFF_RE.search(text.replace("\r\n", "\n")))
 
 
-def make_binding(
+def make_endpoint_record(
     probe: dict[str, Any],
     model: dict[str, Any],
     qualification_ref: str,
     qualification_sha: str,
-    timeout_seconds: int,
     frozen_at: str,
 ) -> dict[str, Any]:
     cli = probe.get("ollama", {}).get("cli", {})
     version = cli.get("stdout") if cli.get("returncode") == 0 else "UNMEASURED"
-    model_name = str(model.get("name"))
-    model_digest = str(model.get("digest"))
-    binding_seed = f"{model_name}|{model_digest}|{qualification_sha}".encode("utf-8")
-    binding_id = "WP04-LOCAL-OLLAMA-" + sha256_bytes(binding_seed)[:16]
     return {
-        "schema_id": "ndv-p1-wp04-executor-binding-v1",
-        "binding_id": binding_id,
-        "campaign_ref": "experiments/p1/wp04-real-executor-smoke-v1.json",
-        "surface_class": "LOCAL_PINNED",
+        "schema_id": "ndv-wp05-local-model-endpoint-v1",
+        "classification": "MODEL_ENDPOINT_QUALIFIED_NOT_EXECUTOR",
         "provider_or_runtime": f"Ollama local runtime ({version})",
-        "exact_executor_identity": model_name,
-        "version_or_model_hash": model_digest,
-        "invocation_command_or_surface": "http://127.0.0.1:11434/api/generate",
+        "model_identity": model.get("name"),
+        "model_digest": model.get("digest"),
+        "quantization_level": model.get("quantization_level"),
+        "parameter_size": model.get("parameter_size"),
+        "endpoint": "http://127.0.0.1:11434/api/generate",
         "qualification_evidence_ref": qualification_ref,
         "qualification_evidence_sha256": qualification_sha,
-        "telemetry_mode": {
-            "identity": "MODEL_NAME_PLUS_INSTALLED_DIGEST",
-            "usage": "OLLAMA_NATIVE_RESPONSE_FIELDS_OR_EXPLICIT_MISSINGNESS",
-            "timestamps": "NDV_WALL_CLOCK_PLUS_PROVIDER_FIELDS_WHEN_EXPOSED",
-            "raw_response_or_local_trace": "RAW_RESPONSE_PERSISTED_AND_HASHED",
-        },
-        "candidate_capture_mode": "RAW_RESPONSE_AND_EXTRACTED_TEXT",
-        "timeout_seconds": timeout_seconds,
-        "network_policy": "LOCAL_LOOPBACK_ONLY",
-        "retry_limit": 0,
-        "escalation_limit": 0,
-        "automatic_download": False,
-        "implicit_fallback": False,
-        "dynamic_routing": False,
-        "pricing_or_local_cost_ref": "LOCAL_COST_EVIDENCE_REQUIRED_AT_WP04_RUN_ACCOUNTING",
+        "repository_tool_access": False,
+        "wp04_task_exposure_authorized": False,
+        "required_next_gate": "MODEL_PLUS_FROZEN_SCAFFOLD_OR_STANDALONE_AGENT_BINDING_V2",
         "frozen_at": frozen_at,
-        "status": "QUALIFIED",
     }
 
 
@@ -113,7 +100,12 @@ def main() -> int:
     ap.add_argument("--probe", required=True, type=Path)
     ap.add_argument("--model", required=True)
     ap.add_argument("--out", required=True, type=Path)
-    ap.add_argument("--binding-out", required=True, type=Path)
+    ap.add_argument(
+        "--binding-out",
+        required=True,
+        type=Path,
+        help="Compatibility name: writes an endpoint record, not a WP-04 executable binding.",
+    )
     ap.add_argument("--timeout", type=int, default=120)
     args = ap.parse_args()
 
@@ -136,7 +128,7 @@ def main() -> int:
             raise ValueError(f"runtime reported unexpected model identity: {observed_model!r}")
         if not candidate_is_valid(candidate):
             raise ValueError("synthetic coding qualification output did not satisfy the frozen diff oracle")
-        status = "S0_READY"
+        status = "S0_MODEL_ENDPOINT_READY"
         error = None
     except Exception as exc:
         response, raw, elapsed, candidate = {}, b"", 0.0, None
@@ -144,7 +136,7 @@ def main() -> int:
         error = f"{type(exc).__name__}: {exc}"
 
     evidence = {
-        "schema_id": "ndv-local-ollama-qualification-v1",
+        "schema_id": "ndv-local-ollama-qualification-v2",
         "timestamp_utc": frozen_at,
         "probe_ref": str(args.probe),
         "model_name": args.model,
@@ -164,20 +156,26 @@ def main() -> int:
         "credentials_used": False,
         "p1_task_exposed": False,
         "holdout_access": "NONE",
+        "standalone_executor_qualification": "NOT_CLAIMED",
     }
     encoded = json.dumps(evidence, indent=2, sort_keys=True, ensure_ascii=False) + "\n"
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(encoded, encoding="utf-8")
     evidence_sha = sha256_bytes(encoded.encode("utf-8"))
 
-    if status == "S0_READY":
-        binding = make_binding(probe, model, str(args.out), evidence_sha, args.timeout, frozen_at)
+    if status == "S0_MODEL_ENDPOINT_READY":
+        endpoint_record = make_endpoint_record(probe, model, str(args.out), evidence_sha, frozen_at)
         args.binding_out.parent.mkdir(parents=True, exist_ok=True)
-        args.binding_out.write_text(json.dumps(binding, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-        print(json.dumps({"status": status, "binding": str(args.binding_out), "evidence": str(args.out)}, indent=2))
+        args.binding_out.write_text(json.dumps(endpoint_record, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        print(json.dumps({
+            "status": status,
+            "endpoint_record": str(args.binding_out),
+            "evidence": str(args.out),
+            "wp04_task_exposure_authorized": False,
+        }, indent=2))
         return 0
 
-    print(json.dumps({"status": status, "binding": None, "evidence": str(args.out), "error": error}, indent=2))
+    print(json.dumps({"status": status, "endpoint_record": None, "evidence": str(args.out), "error": error}, indent=2))
     return 2
 
 
