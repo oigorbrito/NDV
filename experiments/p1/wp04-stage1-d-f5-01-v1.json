@@ -1,0 +1,29 @@
+{
+  "schema_id": "ndv-p1-wp04-stage1-task-v1",
+  "task_id": "D-F5-01",
+  "family": "F5",
+  "repository": "oigorbrito/metaO",
+  "base_sha": "9cc5d6d722d509175a669624c9235156dffb4f85",
+  "source_issue": "oigorbrito/metaO#400",
+  "source_pr": "oigorbrito/metaO#401",
+  "task_statement_mode": "S0_RAW_TASK_RECONSTRUCTED_FROM_PRE_SOLUTION_REQUIREMENT",
+  "task_statement": "Operator UX: ensure `doctor` runs before persistent SQLite stores, ledgers, or execution-handle stores are constructed; introduce one canonical callable loader for `module:path.to.callable`; reuse that loader from mission CLI, runtime CLI, and doctor; preserve current doctor JSON/status semantics and exit-code compatibility; add or update focused regression coverage for nested factory paths and doctor preflight behavior. Non-goals: no bootstrap/composition-root redesign, no new DI container or lifecycle abstraction, no registry/catalog/admission/certification changes.",
+  "solution_isolation": {
+    "gold_patch_available_to_executor": false,
+    "solution_head_available_to_executor": false,
+    "historical_pr_diff_available_to_executor": false,
+    "verifier_details_in_prompt": false
+  },
+  "verifier": {
+    "focal": ["python", "-m", "unittest", "tests.unit.test_operator_ux_doctor"],
+    "preservation": ["python", "-m", "unittest", "discover", "-s", "tests/unit"]
+  },
+  "execution_policy": {
+    "retry_limit": 0,
+    "escalation_limit": 0,
+    "dynamic_routing": false,
+    "implicit_fallback": false,
+    "holdout_access": false,
+    "stage2_release_requires": "TRACEABLE_STAGE1_RESULT"
+  }
+}
