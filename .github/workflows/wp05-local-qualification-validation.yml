@@ -6,7 +6,12 @@ on:
       - 'tools/ndv_local_surface_probe.py'
       - 'tools/ndv_qualify_local_ollama_executor.py'
       - 'tools/test_ndv_qualify_local_ollama_executor.py'
+      - 'tools/ndv_qualify_aider_ollama_scaffold.py'
+      - 'tools/test_ndv_qualify_aider_ollama_scaffold.py'
       - 'tools/ndv_validate_wp04_smoke.py'
+      - 'tools/test_ndv_validate_wp04_smoke.py'
+      - 'experiments/p1/wp04-executor-binding-v2.template.json'
+      - 'experiments/p1/wp05-agent-scaffold-screening-v1.json'
       - 'docs/research/WP-05-FREE-LOCAL-EXECUTOR-SCREENING.md'
       - '.github/workflows/wp05-local-qualification-validation.yml'
   workflow_dispatch:
@@ -30,11 +35,15 @@ jobs:
         run: |
           python -m py_compile tools/ndv_local_surface_probe.py
           python -m py_compile tools/ndv_qualify_local_ollama_executor.py
+          python -m py_compile tools/ndv_qualify_aider_ollama_scaffold.py
           python -m py_compile tools/ndv_validate_wp04_smoke.py
 
       - name: Run local qualification unit tests
         working-directory: tools
-        run: python -m unittest -v test_ndv_qualify_local_ollama_executor.py
+        run: |
+          python -m unittest -v test_ndv_qualify_local_ollama_executor.py
+          python -m unittest -v test_ndv_qualify_aider_ollama_scaffold.py
+          python -m unittest -v test_ndv_validate_wp04_smoke.py
 
       - name: Revalidate WP-04 static campaign
         run: python tools/ndv_validate_wp04_smoke.py
