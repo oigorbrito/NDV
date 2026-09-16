@@ -14,6 +14,7 @@ import os
 import subprocess
 import sys
 import time
+import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -151,6 +152,36 @@ def validate_aider_version(aider: str, binding: dict[str, Any]) -> str:
     return observed
 
 
+def validate_ollama_model(binding: dict[str, Any]) -> dict[str, str]:
+    model = binding.get("model")
+    if not isinstance(model, dict):
+        raise ValueError("binding missing model object")
+    endpoint = model.get("endpoint")
+    expected_name = model.get("identity")
+    expected_digest = model.get("digest_or_exact_version")
+    if endpoint != "http://127.0.0.1:11434":
+        raise ValueError(f"unexpected frozen Ollama endpoint: {endpoint!r}")
+    if not isinstance(expected_name, str) or not expected_name:
+        raise ValueError("binding missing frozen model identity")
+    if not isinstance(expected_digest, str) or len(expected_digest) != 64:
+        raise ValueError("binding missing exact 64-hex model digest")
+    try:
+        with urllib.request.urlopen(endpoint + "/api/tags", timeout=10) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except Exception as exc:
+        raise ValueError(f"Ollama model inventory unavailable: {exc}") from exc
+    models = payload.get("models") if isinstance(payload, dict) else None
+    if not isinstance(models, list):
+        raise ValueError("Ollama /api/tags returned invalid model inventory")
+    matches = [m for m in models if isinstance(m, dict) and m.get("name") == expected_name]
+    if len(matches) != 1:
+        raise ValueError(f"frozen model identity must match exactly one installed model: {expected_name}")
+    observed_digest = matches[0].get("digest")
+    if observed_digest != expected_digest:
+        raise ValueError(f"Ollama model digest mismatch: expected {expected_digest}, observed {observed_digest}")
+    return {"endpoint": endpoint, "name": expected_name, "digest": expected_digest}
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--binding", required=True, type=Path)
@@ -171,6 +202,7 @@ def main() -> int:
         stage1_manifest = validate_stage1_import(args.stage1_import.resolve(), str(binding.get("binding_id")))
         aider = resolve_frozen_aider(binding, args.aider_exe)
         aider_version = validate_aider_version(aider, binding)
+        ollama_model = validate_ollama_model(binding)
     except Exception as exc:
         raise SystemExit(f"STAGE2_BLOCKED: {exc}") from exc
 
@@ -209,8 +241,8 @@ def main() -> int:
 
     started = datetime.now(timezone.utc).isoformat()
     exec_env = os.environ.copy()
-    exec_env["OLLAMA_API_BASE"] = "http://127.0.0.1:11434"
-    model_name = binding["model"]["identity"]
+    exec_env["OLLAMA_API_BASE"] = ollama_model["endpoint"]
+    model_name = ollama_model["name"]
     message = task["task_statement"]
     argv = [aider, "--model", f"ollama_chat/{model_name}", "--message", message, "--yes", "--no-auto-commits", "--no-dirty-commits", "--no-gitignore", "--no-check-update", "--no-stream", "--disable-playwright"]
     t0 = time.monotonic()
@@ -250,6 +282,7 @@ def main() -> int:
         "binding_id": binding.get("binding_id"),
         "executor_identity": binding.get("exact_executor_identity"),
         "aider_version_revalidated": aider_version,
+        "ollama_model_revalidated": ollama_model,
         "stage1_import_manifest_schema": stage1_manifest.get("schema_id"),
         "stage1_candidate_diff_sha256": stage1_manifest.get("candidate_diff_sha256"),
         "materialization_origin": origin,
