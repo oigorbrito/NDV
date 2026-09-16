@@ -1,0 +1,28 @@
+{
+  "schema_id": "ndv-p1-wp04-executor-binding-v1",
+  "binding_id": "REQUIRED_UNIQUE",
+  "campaign_ref": "experiments/p1/wp04-real-executor-smoke-v1.json",
+  "surface_class": "LOCAL_PINNED|HOSTED_FREE_PINNED|SUBSCRIPTION_EXECUTOR_PINNED",
+  "provider_or_runtime": "REQUIRED",
+  "exact_executor_identity": "REQUIRED",
+  "version_or_model_hash": "REQUIRED",
+  "invocation_command_or_surface": "REQUIRED",
+  "qualification_evidence_ref": "REQUIRED",
+  "telemetry_mode": {
+    "identity": "REQUIRED",
+    "usage": "REQUIRED_OR_EXPLICIT_MISSINGNESS",
+    "timestamps": "REQUIRED",
+    "raw_response_or_local_trace": "REQUIRED"
+  },
+  "candidate_capture_mode": "REQUIRED",
+  "timeout_seconds": "REQUIRED_POSITIVE_INTEGER",
+  "network_policy": "REQUIRED",
+  "retry_limit": 0,
+  "escalation_limit": 0,
+  "automatic_download": false,
+  "implicit_fallback": false,
+  "dynamic_routing": false,
+  "pricing_or_local_cost_ref": "REQUIRED_OR_EXPLICIT_NOT_APPLICABLE",
+  "frozen_at": "REQUIRED_ISO8601",
+  "status": "QUALIFIED|BLOCKED"
+}
