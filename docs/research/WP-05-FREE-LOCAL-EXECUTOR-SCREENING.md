@@ -6,94 +6,97 @@ Identify executor surfaces that can enter later NDV experiments without requirin
 
 ## Current strategy
 
-1. Probe the local machine first, without downloads and without credentials.
-2. If a local Ollama runtime and installed model exist, qualify that exact model/digest on a synthetic non-P1 task.
-3. Only if useful, consider downloading a pinned local model after machine fit is known.
-4. Hosted-free candidates are screened separately and require exact model identity; dynamic routers such as `openrouter/free` are exploration-only.
+1. Probe the local machine without credentials or implicit downloads.
+2. Qualify an exact installed Ollama model/digest as an inference endpoint on a synthetic non-P1 task.
+3. Separately qualify a repository-capable coding-agent scaffold using the same frozen model.
+4. Only a binding-v2 containing both model identity and frozen scaffold identity can authorize WP-04 task exposure.
 
-## Local probe
+`MODEL_ENDPOINT_READY != SOFTWARE_EXECUTOR_READY`.
 
-Run:
+## Observed local surface — 2026-09-16
 
-```powershell
-python tools/ndv_local_surface_probe.py --out .ndv-probes/local-surface.json
+The operator-provided machine probe observed:
+
+- Windows 11 / AMD64;
+- 8 logical CPUs;
+- approximately 12.7 GB RAM;
+- NVIDIA GeForce GTX 1650, 4096 MiB;
+- Ollama 0.34.1 reachable on loopback;
+- installed model `qwen2.5-coder:3b`;
+- model digest `f72c60cabf6237b07f6e632b2c48d533cef25eda2efbd34bed21c5e9c01e6225`;
+- quantization `Q4_K_M`;
+- parameter size `3.1B`.
+
+The synthetic model-endpoint qualification returned `S0_READY` under the original v1 bridge and the original WP-04 binding validator returned `PASS`. No P1 task had been exposed at that point.
+
+A methodological review immediately after that result found that the raw Ollama `/api/generate` endpoint has no repository inspection/modification capability by itself. Therefore the original v1 binding is retained as endpoint evidence but is superseded for task-exposure authority by `experiments/p1/wp04-executor-binding-v2.template.json`.
+
+## Local model endpoint qualification
+
+`tools/ndv_qualify_local_ollama_executor.py` now classifies a passing Ollama surface as:
+
+```text
+S0_MODEL_ENDPOINT_READY
+MODEL_ENDPOINT_QUALIFIED_NOT_EXECUTOR
 ```
 
-The probe is read-only. It records OS/CPU/RAM, NVIDIA GPU facts when available, Ollama version/API reachability, and installed model names/digests/quantization metadata where exposed. It does not download a model and does not use credentials.
+It persists exact model identity/digest and synthetic coding evidence but explicitly sets `wp04_task_exposure_authorized=false`.
 
-Possible first classifications:
+## Repository-capable scaffold qualification
 
-- `S0_ENVIRONMENT_BLOCKED` — no usable local runtime yet.
-- `S0_DOWNLOAD_REQUIRED` — Ollama exists, but no installed model is available.
-- `S0_LOCAL_SURFACE_DISCOVERED` — installed models were found; each still needs executor-level qualification.
+The scaffold screen is frozen in `experiments/p1/wp05-agent-scaffold-screening-v1.json`.
 
-## Local Ollama qualification
+For the first native-Windows smoke, Aider is selected for qualification because it documents Windows installation and direct Ollama integration. mini-SWE-agent remains relevant prior art/candidate but is deferred for this first Windows smoke because its local environment describes bash-oriented command execution, creating avoidable shell uncertainty.
 
-When the probe reports one or more installed models, choose the **exact model name already present in the probe** and run:
+Qualify Aider + the already installed Ollama model with:
 
 ```powershell
-python tools/ndv_qualify_local_ollama_executor.py `
+python tools/ndv_qualify_aider_ollama_scaffold.py `
   --probe .ndv-probes/local-surface.json `
-  --model <exact-installed-model-name> `
-  --out .ndv-probes/qualification/<model>.json `
-  --binding-out .ndv-probes/bindings/wp04-local-ollama.json
+  --model qwen2.5-coder:3b `
+  --out .ndv-probes/qualification/aider-qwen25-coder-3b.json `
+  --binding-out .ndv-probes/bindings/wp04-aider-qwen25-coder-3b-v2.json
 ```
 
-This qualification step:
-
-- never calls `ollama pull` or any other download path;
-- sends one fixed synthetic coding prompt unrelated to P1 tasks or holdout data;
-- requires the exact installed model name and digest discovered by the probe;
-- requires the model to produce the frozen expected unified diff;
-- persists raw response identity/timing/usage fields when Ollama exposes them;
-- records explicit missingness rather than treating absent telemetry as zero;
-- emits a WP-04 binding only on `S0_READY`;
-- otherwise persists `S0_FAIL` evidence and emits no binding.
+The qualifier creates a temporary synthetic git repository containing only `fixture.py` with `VALUE = 1`, invokes Aider non-interactively through the local Ollama model, and requires the resulting `git diff` to contain exactly the intended transition to `VALUE = 2`. It does not expose D-F5-01 or holdout material.
 
 A generated binding must then pass:
 
 ```powershell
 python tools/ndv_validate_wp04_smoke.py `
-  --binding .ndv-probes/bindings/wp04-local-ollama.json
+  --binding .ndv-probes/bindings/wp04-aider-qwen25-coder-3b-v2.json
 ```
 
-This creates the direct bridge from WP-05 to the already frozen WP-04 pipeline smoke contract.
+Only that binding-v2 PASS authorizes WP-04 Stage 1 task exposure.
 
 ## Hosted-free candidate universe
 
-As of 2026-09-16, the prospective pinned candidates are recorded in `experiments/p1/free-local-executor-screening-v1.json`. Discovery is not qualification.
+Prospective hosted-free candidates remain recorded in `experiments/p1/free-local-executor-screening-v1.json`. Discovery is not qualification, and dynamic routers remain unsuitable for frozen treatment identity.
 
-## Admission requirements
+## Accounting
 
-A model becomes an executor candidate only after the historical P1 executor screening requirements are satisfied, including reproducible invocation, exact identity, candidate artifact capture, timeout/cancel behavior, usage telemetry or explicit missingness, terms/licensing, and known cost provenance.
-
-For local execution, also retain hardware identity, runtime/model digest, quantization, warm/cold state, load/wall time, and token telemetry where available. `FREE != ZERO COST` remains mandatory.
+`FREE != ZERO COST`. Local execution must retain hardware identity, runtime/model digest, quantization, wall time, warm/cold state where relevant, token telemetry where exposed, and explicit missingness otherwise. No hardware-to-token conversion is permitted.
 
 ## Prohibited shortcuts
 
-- Do not call a random/free router a pinned treatment.
-- Do not treat a web chat subscription as an experimental executor.
-- Do not silently download a large model during screening.
-- Do not treat missing telemetry as zero.
-- Do not select models based on performance on admitted P1 tasks before the candidate universe is frozen.
-- Do not generate a WP-04 binding from discovery metadata alone; the synthetic qualification must pass first.
-
-## Gate
-
-WP-05 is complete when at least one additional free/local executor surface is either:
-
-- qualified (`S0_READY` or explicitly telemetry-limited), or
-- rejected/blocked with auditable evidence.
-
-A blocked outcome is valid; this work package exists to establish what is actually available, not to force a free/local treatment into P1.
+- Do not call a raw model API a standalone executor.
+- Do not expose P1 tasks before scaffold qualification and binding-v2 validation.
+- Do not silently download a model during qualification/run.
+- Do not enable dynamic routing, fallback, retry, or escalation.
+- Do not coerce missing telemetry to zero.
+- Do not select scaffolds based on performance on admitted P1 tasks.
 
 ## Current status
 
 ```text
-LOCAL_SURFACE_PROBE = IMPLEMENTED
-LOCAL_OLLAMA_QUALIFIER = IMPLEMENTED
-WP04_BINDING_BRIDGE = IMPLEMENTED
-REAL_MACHINE_PROBE = NOT_YET_OBSERVED
-REAL_EXECUTOR_BINDING = NOT_YET_FROZEN
+LOCAL_MACHINE_PROBE = OBSERVED
+OLLAMA_RUNTIME = AVAILABLE
+LOCAL_MODEL = qwen2.5-coder:3b
+LOCAL_MODEL_DIGEST = f72c60cabf6237b07f6e632b2c48d533cef25eda2efbd34bed21c5e9c01e6225
+MODEL_ENDPOINT_QUALIFICATION = PASS
+MODEL_ENDPOINT_CLASS = MODEL_ENDPOINT_QUALIFIED_NOT_EXECUTOR
+WP04_BINDING_V1 = SUPERSEDED_BEFORE_TASK_EXPOSURE
+AIDER_SCAFFOLD_QUALIFIER = IMPLEMENTED
+WP04_BINDING_V2 = PENDING_LOCAL_SCAFFOLD_QUALIFICATION
 P1_TASK_EXPOSURE = NONE
 ```
