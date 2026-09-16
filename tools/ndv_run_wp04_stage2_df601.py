@@ -35,8 +35,12 @@ def write_log(path: Path, proc: subprocess.CompletedProcess[str]) -> None:
     path.write_text((proc.stdout or "") + ("\n[stderr]\n" + proc.stderr if proc.stderr else ""), encoding="utf-8")
 
 
+def sha256_bytes(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
+
+
 def sha256_text(text: str) -> str:
-    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+    return sha256_bytes(text.encode("utf-8"))
 
 
 def require_clean_exact_base(workspace: Path, base_sha: str) -> None:
@@ -65,12 +69,45 @@ def materialize(source_repo: Path, workspace: Path, base_sha: str, evidence: Pat
     write_log(evidence / "materialization-fetch.log", fetch)
     if fetch.returncode != 0:
         raise RuntimeError("exact base fetch failed")
+    object_check = run(["git", "cat-file", "-e", f"{base_sha}^{{tree}}"], workspace, 30)
+    write_log(evidence / "materialization-object-check.log", object_check)
+    if object_check.returncode != 0:
+        raise RuntimeError("exact base tree unavailable")
     checkout = run(["git", "checkout", "--detach", base_sha], workspace, 120)
     write_log(evidence / "materialization-checkout.log", checkout)
     if checkout.returncode != 0:
         raise RuntimeError("exact base checkout failed")
     require_clean_exact_base(workspace, base_sha)
     return origin
+
+
+def validate_stage1_import(path: Path, binding_id: str) -> dict[str, Any]:
+    manifest_path = path / "import-manifest.json"
+    report_path = path / "run-report.json"
+    if not manifest_path.is_file() or not report_path.is_file():
+        raise ValueError("Stage 1 import manifest and run-report are required")
+    manifest = load(manifest_path)
+    report = load(report_path)
+    if manifest.get("schema_id") != "ndv-wp04-import-manifest-v2":
+        raise ValueError("Stage 1 must use evidence-only import manifest v2")
+    if manifest.get("raw_evidence_preserved") is not True or manifest.get("treatment_reexecuted") is not False:
+        raise ValueError("Stage 1 import provenance invalid")
+    if manifest.get("task_id") != "D-F5-01" or report.get("task_id") != "D-F5-01":
+        raise ValueError("Stage 1 task mismatch")
+    if manifest.get("outcome") != "SMOKE_VALID_FAILED" or report.get("outcome") != "SMOKE_VALID_FAILED":
+        raise ValueError("expected the frozen valid-failed Stage 1 result")
+    if manifest.get("binding_id") != binding_id or report.get("binding_id") != binding_id:
+        raise ValueError("Stage 1 and Stage 2 binding mismatch")
+    index = manifest.get("preserved_artifacts", {})
+    for rel in ("run-report.json", "evidence/candidate.diff", "evidence/executor.log"):
+        record = index.get(rel)
+        artifact = path / Path(rel)
+        if not isinstance(record, dict) or not artifact.is_file():
+            raise ValueError(f"missing hashed Stage 1 artifact: {rel}")
+        data = artifact.read_bytes()
+        if sha256_bytes(data) != record.get("sha256") or len(data) != record.get("bytes"):
+            raise ValueError(f"Stage 1 artifact hash/size mismatch: {rel}")
+    return manifest
 
 
 def main() -> int:
@@ -83,16 +120,16 @@ def main() -> int:
     ap.add_argument("--timeout", type=int, default=1800)
     args = ap.parse_args()
 
-    import_manifest = load(args.stage1_import / "import-manifest.json")
-    if import_manifest.get("task_id") != "D-F5-01" or import_manifest.get("outcome") != "SMOKE_VALID_FAILED":
-        raise SystemExit("STAGE2_BLOCKED: valid imported Stage 1 evidence required")
-
     task = load(TASK_PATH)
     binding = load(args.binding)
     if binding.get("schema_id") != "ndv-p1-wp04-executor-binding-v2" or binding.get("status") != "QUALIFIED":
         raise SystemExit("qualified binding-v2 required")
-    if import_manifest.get("binding_id") != binding.get("binding_id"):
-        raise SystemExit("STAGE2_BLOCKED: Stage 1 and Stage 2 binding mismatch")
+    if binding.get("retry_limit") != 0 or binding.get("escalation_limit") != 0:
+        raise SystemExit("WP-04 Stage 2 forbids retry/escalation")
+    try:
+        stage1_manifest = validate_stage1_import(args.stage1_import.resolve(), str(binding.get("binding_id")))
+    except Exception as exc:
+        raise SystemExit(f"STAGE2_BLOCKED: {exc}") from exc
 
     aider = str(args.aider_exe) if args.aider_exe else shutil.which("aider")
     if not aider or not Path(aider).exists():
@@ -173,6 +210,8 @@ def main() -> int:
         "base_sha": task["base_sha"],
         "binding_id": binding.get("binding_id"),
         "executor_identity": binding.get("exact_executor_identity"),
+        "stage1_import_manifest_schema": stage1_manifest.get("schema_id"),
+        "stage1_candidate_diff_sha256": stage1_manifest.get("candidate_diff_sha256"),
         "materialization_origin": origin,
         "started_at": started,
         "completed_at": datetime.now(timezone.utc).isoformat(),
