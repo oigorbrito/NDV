@@ -10,6 +10,7 @@ on:
       - 'experiments/p1/s2-audit-state-01.json'
       - 'experiments/p1/s2-verifier-environment-audit-v2.json'
       - 'tools/ndv_acquire_s2_pinned_parquet.py'
+      - 'tools/ndv_materialize_s2_wave.py'
       - 'tools/ndv_validate_corpus_intake.py'
       - 'tools/ndv_extract_pinned_swe_rebench_rows.py'
       - 'tools/ndv_quarantine_swe_rebench_rows.py'
@@ -20,6 +21,7 @@ on:
       - 'tools/ndv_decide_s2_admission.py'
       - 'tools/ndv_freeze_s2_admission.py'
       - 'tools/test_ndv_acquire_s2_pinned_parquet.py'
+      - 'tools/test_ndv_materialize_s2_wave.py'
       - 'tools/test_ndv_validate_corpus_intake.py'
       - 'tools/test_ndv_extract_pinned_swe_rebench_rows.py'
       - 'tools/test_ndv_quarantine_swe_rebench_rows.py'
@@ -40,6 +42,7 @@ on:
       - 'experiments/p1/s2-audit-state-01.json'
       - 'experiments/p1/s2-verifier-environment-audit-v2.json'
       - 'tools/ndv_acquire_s2_pinned_parquet.py'
+      - 'tools/ndv_materialize_s2_wave.py'
       - 'tools/ndv_validate_corpus_intake.py'
       - 'tools/ndv_extract_pinned_swe_rebench_rows.py'
       - 'tools/ndv_quarantine_swe_rebench_rows.py'
@@ -50,6 +53,7 @@ on:
       - 'tools/ndv_decide_s2_admission.py'
       - 'tools/ndv_freeze_s2_admission.py'
       - 'tools/test_ndv_acquire_s2_pinned_parquet.py'
+      - 'tools/test_ndv_materialize_s2_wave.py'
       - 'tools/test_ndv_validate_corpus_intake.py'
       - 'tools/test_ndv_extract_pinned_swe_rebench_rows.py'
       - 'tools/test_ndv_quarantine_swe_rebench_rows.py'
@@ -77,6 +81,7 @@ jobs:
       - name: Compile S2 admission tooling
         run: |
           python -m py_compile tools/ndv_acquire_s2_pinned_parquet.py
+          python -m py_compile tools/ndv_materialize_s2_wave.py
           python -m py_compile tools/ndv_validate_corpus_intake.py
           python -m py_compile tools/ndv_extract_pinned_swe_rebench_rows.py
           python -m py_compile tools/ndv_quarantine_swe_rebench_rows.py
@@ -94,6 +99,7 @@ jobs:
         working-directory: tools
         run: |
           python -m unittest -v test_ndv_acquire_s2_pinned_parquet.py
+          python -m unittest -v test_ndv_materialize_s2_wave.py
           python -m unittest -v test_ndv_validate_corpus_intake.py
           python -m unittest -v test_ndv_extract_pinned_swe_rebench_rows.py
           python -m unittest -v test_ndv_quarantine_swe_rebench_rows.py
