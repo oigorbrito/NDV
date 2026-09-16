@@ -1,0 +1,51 @@
+{
+  "schema_id": "ndv-p1-wp04-stage1-result-v1",
+  "task_id": "D-F5-01",
+  "run_id": "wp04-stage1-d-f5-01-r1",
+  "binding_id": "WP04-AIDER-OLLAMA-bcf636703b1a2973",
+  "executor_identity": "aider(aider 0.86.2)+qwen2.5-coder:3b",
+  "base_sha": "9cc5d6d722d509175a669624c9235156dffb4f85",
+  "outcome": "SMOKE_VALID_FAILED",
+  "failure_attribution": {
+    "contract_class": "PRODUCT_FAILURE",
+    "scope": "FROZEN_EXECUTOR_SURFACE",
+    "interpretation": "The frozen Aider+Qwen surface returned success without repository changes. This does not isolate failure to the model alone.",
+    "observed_behavior": "Aider reported that the model requested files be added to chat, then completed with exit code 0 and no candidate diff."
+  },
+  "candidate": {
+    "diff_bytes": 0,
+    "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "verification": {
+    "baseline_structural_focal_returncode": 2,
+    "baseline_preservation_returncode": 0,
+    "candidate_structural_focal_returncode": 2,
+    "candidate_preservation_returncode": 0
+  },
+  "execution": {
+    "executor_returncode": 0,
+    "timed_out": false,
+    "wall_seconds": 202.62882949999766,
+    "retry_count": 0,
+    "escalation_count": 0,
+    "holdout_access": "NONE"
+  },
+  "accounting": {
+    "executor_log_reported_token_lines": [
+      "Tokens: 8.3k sent, 81 received.",
+      "Tokens: 19k sent, 23 received."
+    ],
+    "reconciled_input_tokens_approx": 27300,
+    "reconciled_output_tokens": 104,
+    "reconciled_total_tokens_approx": 27404,
+    "approximation_reason": "Aider abbreviated input token counts using k notation.",
+    "monetary_cost": "LOCAL_COST_NOT_CONVERTED_TO_TOKENS"
+  },
+  "stage2_gate": "RELEASED",
+  "comparative_authority": "NONE",
+  "notes": [
+    "This is a pipeline-smoke result only.",
+    "No executor ranking, routing claim, economic superiority claim, or architecture claim is authorized.",
+    "Raw local run artifacts must still be imported and preserved before WP-04 campaign closure."
+  ]
+}
