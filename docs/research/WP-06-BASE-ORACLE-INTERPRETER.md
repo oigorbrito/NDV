@@ -2,68 +2,51 @@
 
 ## Purpose
 
-Convert an already-recorded pre-solution base-run log into explicit oracle evidence without executing a model, applying a solution patch, or changing the candidate workspace.
+Convert an already-recorded, harness-valid pre-solution base-run log into explicit oracle evidence without executing a model, applying a solution/test patch, or changing the candidate workspace.
 
-The implementation is `tools/ndv_interpret_s2_base_oracle.py`.
+Implementation: `tools/ndv_interpret_s2_base_oracle.py`.
 
-## Inputs
+## Inputs and binding
 
 The interpreter requires:
 
-1. the candidate `admission-only.json` produced by quarantine;
-2. the corresponding `base-run.json` produced by `tools/ndv_run_s2_base_audit.py`;
+1. quarantine `admission-only.json` with `full_row` and source binding;
+2. a `ndv-p1-s2-base-audit-run-v2` report;
 3. a local checkout of `SWE-rebench/SWE-rebench-V2` at exactly `c71902a8cf8d2b725f63d51f199f4d3e56f68d2d`;
-4. the recorded base-run log whose SHA-256 matches the base-run evidence.
+4. the recorded stdout log matching `evidence.stdout_sha256`.
 
-The frozen parser implementation is loaded from `lib/agent/log_parsers.py` at that exact upstream revision. The parser name comes from admission-only `install_config.log_parser`.
+It re-hashes the admission `full_row`, checks source identity/base revision against the base run, requires `harness_integrity=PASS`, and rejects any run reporting gold or test patch application.
 
-## Preconditions
-
-Interpretation refuses to proceed when:
-
-- candidate instance identity differs between row and base run;
-- base commit differs between row and base run;
-- the base run reports either gold `patch` or `test_patch` as applied;
-- the upstream checkout is not at the frozen revision;
-- the recorded log hash does not match its evidence;
-- the declared log parser is unavailable in the frozen parser registry.
+The frozen parser is `lib/agent/log_parsers.py` at that exact upstream revision; parser selection comes from the quarantined full row's `install_config.log_parser`.
 
 ## Classification
 
-The result is one of:
+The v2 interpretation emits one of:
 
-- `EXPECTED_BASE_BEHAVIOR` — every preregistered `FAIL_TO_PASS` test is observed failing/erroring and every `PASS_TO_PASS` test is observed passing;
-- `ORACLE_MISMATCH` — expected tests are missing, statuses conflict with the frozen expectations, or a bug-fix candidate contains no usable `FAIL_TO_PASS` expectation;
-- `ENVIRONMENT_INCONCLUSIVE` — the frozen parser produces no test observations from the recorded base log.
+- `EXPECTED_BASE_BEHAVIOR`: every preregistered `FAIL_TO_PASS` test is observed failed/error and every `PASS_TO_PASS` test is observed passed;
+- `ORACLE_MISMATCH`: expected tests are missing, statuses conflict, or no usable focal failures exist;
+- `ENVIRONMENT_INCONCLUSIVE`: the frozen parser produces no test observations.
 
-These classifications describe admission evidence, not treatment performance.
+Missing expected tests are not filled from `test_patch`. A likely test-patch-dependent verifier is still an oracle blocker until independent pre-solution evidence exists.
+
+These classifications concern admission evidence only, not treatment performance.
 
 ## Command
 
 ```bash
 python tools/ndv_interpret_s2_base_oracle.py \
   --admission-row .ndv-corpus/s2-w01/quarantine/<candidate>/admission-only.json \
-  --base-run .ndv-corpus/s2-w01/audit/<candidate>/base-run.json \
+  --base-run .ndv-corpus/s2-w01/audit/<candidate>/base-audit-run.json \
   --upstream-root ../SWE-rebench-V2 \
   --out .ndv-corpus/s2-w01/audit/<candidate>/base-oracle.json
 ```
 
 ## Audit integration
 
-`tools/ndv_validate_s2_audit.py` requires any future `AUDIT_PASS` record to include:
+Under `experiments/p1/s2-verifier-environment-audit-v2.json`, `AUDIT_PASS` requires the oracle interpretation hash and `oracle_classification=EXPECTED_BASE_BEHAVIOR` in addition to harness integrity, preservation, verifier independence, immutable environment identity, and no treatment/patch contamination.
 
-- `oracle_interpretation_ref`;
-- `oracle_interpretation_sha256`;
-- `oracle_classification = EXPECTED_BASE_BEHAVIOR`.
-
-`ORACLE_MISMATCH` and `ENVIRONMENT_INCONCLUSIVE` must not be converted into pass by manual interpretation or by treatment output. They require explicit blocker/rejection handling under the audit contract.
+`ORACLE_MISMATCH` and `ENVIRONMENT_INCONCLUSIVE` remain blockers/rejection evidence. They cannot be manually promoted using treatment output or gold knowledge.
 
 ## Non-goals
 
-This interpreter does not:
-
-- repair an oracle;
-- select a treatment;
-- execute an LLM;
-- apply `patch` or `test_patch`;
-- decide final candidate admission by itself.
+This interpreter does not repair an oracle, choose a treatment, execute an LLM, apply `patch`/`test_patch`, or decide final admission by itself.
