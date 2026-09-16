@@ -7,11 +7,17 @@ on:
       - 'experiments/p1/wp04-executor-binding-v1.template.json'
       - 'experiments/p1/wp04-executor-binding-v2.template.json'
       - 'experiments/p1/wp04-stage1-d-f5-01-v1.json'
+      - 'experiments/p1/wp04-stage1-result-r1.json'
+      - 'experiments/p1/wp04-stage2-d-f6-01-v1.json'
       - 'tools/ndv_validate_wp04_smoke.py'
       - 'tools/test_ndv_validate_wp04_smoke.py'
       - 'tools/ndv_verify_df501_structural.py'
       - 'tools/test_ndv_verify_df501_structural.py'
+      - 'tools/ndv_verify_df601_structural.py'
       - 'tools/ndv_run_wp04_stage1_df501.py'
+      - 'tools/ndv_run_wp04_stage2_df601.py'
+      - 'tools/ndv_import_wp04_stage_run.py'
+      - 'tools/test_ndv_import_wp04_stage_run.py'
       - '.github/workflows/wp04-contract-validation.yml'
   pull_request:
     paths:
@@ -19,11 +25,17 @@ on:
       - 'experiments/p1/wp04-executor-binding-v1.template.json'
       - 'experiments/p1/wp04-executor-binding-v2.template.json'
       - 'experiments/p1/wp04-stage1-d-f5-01-v1.json'
+      - 'experiments/p1/wp04-stage1-result-r1.json'
+      - 'experiments/p1/wp04-stage2-d-f6-01-v1.json'
       - 'tools/ndv_validate_wp04_smoke.py'
       - 'tools/test_ndv_validate_wp04_smoke.py'
       - 'tools/ndv_verify_df501_structural.py'
       - 'tools/test_ndv_verify_df501_structural.py'
+      - 'tools/ndv_verify_df601_structural.py'
       - 'tools/ndv_run_wp04_stage1_df501.py'
+      - 'tools/ndv_run_wp04_stage2_df601.py'
+      - 'tools/ndv_import_wp04_stage_run.py'
+      - 'tools/test_ndv_import_wp04_stage_run.py'
       - '.github/workflows/wp04-contract-validation.yml'
   workflow_dispatch:
 
@@ -46,7 +58,10 @@ jobs:
         run: |
           python -m py_compile tools/ndv_validate_wp04_smoke.py
           python -m py_compile tools/ndv_verify_df501_structural.py
+          python -m py_compile tools/ndv_verify_df601_structural.py
           python -m py_compile tools/ndv_run_wp04_stage1_df501.py
+          python -m py_compile tools/ndv_run_wp04_stage2_df601.py
+          python -m py_compile tools/ndv_import_wp04_stage_run.py
 
       - name: Validate frozen campaign
         run: python tools/ndv_validate_wp04_smoke.py
@@ -56,3 +71,4 @@ jobs:
         run: |
           python -m unittest -v test_ndv_validate_wp04_smoke.py
           python -m unittest -v test_ndv_verify_df501_structural.py
+          python -m unittest -v test_ndv_import_wp04_stage_run.py
