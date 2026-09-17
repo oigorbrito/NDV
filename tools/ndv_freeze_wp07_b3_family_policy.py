@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Bind qualified Sol/Terra/Luna Codex surfaces into frozen B3 family policy.
 
-No model is executed. This consumes only existing S0_READY synthetic qualification
-artifacts and the prospective family policy contract.
+No model is executed. This consumes only existing sealed S0_READY synthetic
+qualification bundles and the prospective family policy contract.
 """
 from __future__ import annotations
 
@@ -11,6 +11,8 @@ import hashlib
 import json
 from pathlib import Path
 from typing import Any
+
+from ndv_wp07_codex_bundle import verify_bundle
 
 EXPECTED = {
     "F1": ("gpt-5.6-luna", "CODEX-PLUS-GPT-5.6-LUNA"),
@@ -31,19 +33,19 @@ def rel(path:Path,root:Path)->str:
     try:return str(path.resolve().relative_to(root.resolve())).replace("\\","/")
     except ValueError:return str(path.resolve())
 def verify_candidate(root:Path,model:str,candidate_id:str)->dict[str,Any]:
+    sealed=verify_bundle(root,expected_model=model,expected_candidate=candidate_id)
+    q,b=sealed["qualification"],sealed["binding"]
     qpath=root.resolve()/"qualification.json"; bpath=root.resolve()/"executor-binding.json"
-    if not qpath.is_file() or not bpath.is_file(): raise ValueError(f"{root}: qualification/binding missing")
-    q,b=load(qpath),load(bpath)
     if q.get("status")!="S0_READY" or q.get("schema_id")!="ndv-p1-wp07-codex-subscription-qualification-v1": raise ValueError(f"{root}: S0_READY qualification required")
     if b.get("status")!="QUALIFIED" or b.get("schema_id")!="ndv-p1-wp07-executor-binding-v1": raise ValueError(f"{root}: qualified binding required")
     if q.get("candidate_id")!=candidate_id or b.get("candidate_id")!=candidate_id: raise ValueError(f"{root}: candidate mismatch")
     if q.get("requested_model")!=model or q.get("observed_models")!=[model] or q.get("exact_model_observed") is not True or (b.get("model") or {}).get("identity")!=model: raise ValueError(f"{root}: exact model mismatch")
     if b.get("qualification_file_sha256")!=sha_file(qpath): raise ValueError(f"{root}: qualification hash mismatch")
     if b.get("dynamic_routing") is not False or b.get("implicit_fallback") is not False: raise ValueError(f"{root}: dynamic routing/fallback forbidden")
-    return {"q":q,"b":b,"qpath":qpath,"bpath":bpath}
+    return {"q":q,"b":b,"qpath":qpath,"bpath":bpath,"manifest_path":sealed["manifest_path"]}
 def binding_record(v:dict[str,Any],artifact_root:Path)->dict[str,Any]:
     b=v["b"]
-    return {"binding_id":b["binding_id"],"binding_ref":rel(v["bpath"],artifact_root),"binding_file_sha256":sha_file(v["bpath"]),"qualification_ref":rel(v["qpath"],artifact_root),"qualification_file_sha256":sha_file(v["qpath"]),"exact_executor_identity":b["exact_executor_identity"],"surface_class":"SUBSCRIPTION_EXECUTOR_PINNED"}
+    return {"binding_id":b["binding_id"],"binding_ref":rel(v["bpath"],artifact_root),"binding_file_sha256":sha_file(v["bpath"]),"qualification_ref":rel(v["qpath"],artifact_root),"qualification_file_sha256":sha_file(v["qpath"]),"evidence_manifest_ref":rel(v["manifest_path"],artifact_root),"evidence_manifest_sha256":sha_file(v["manifest_path"]),"exact_executor_identity":b["exact_executor_identity"],"surface_class":"SUBSCRIPTION_EXECUTOR_PINNED"}
 def freeze(registry_path:Path,policy_path:Path,sol_dir:Path,terra_dir:Path,luna_dir:Path,artifact_root:Path)->dict[str,Any]:
     reg=load(registry_path.resolve()); policy=load(policy_path.resolve())
     if reg.get("schema_id")!="ndv-p1-wp07-treatment-bindings-v1" or reg.get("treatment_execution")!="NOT_EXECUTED" or reg.get("holdout_access")!="NONE": raise ValueError("registry invalid/contaminated")
@@ -62,6 +64,7 @@ def freeze(registry_path:Path,policy_path:Path,sol_dir:Path,terra_dir:Path,luna_
     b3["family_policy"]={"F1":"LUNA","F2":"SOL","F3":"TERRA","F4":"LUNA","F5":"TERRA","F6":"SOL"}
     b3["status"]="BOUND_READY"
     b3["policy_ref"]=rel(policy_path.resolve(),artifact_root); b3["policy_file_sha256"]=sha_file(policy_path.resolve())
+    b3["qualification_bundle_manifest_hashes"]={k:sha_file(v["manifest_path"]) for k,v in vals.items()}
     reg["status"]="ALL_TREATMENTS_BOUND" if all(x.get("status")=="BOUND_READY" for x in reg["treatments"].values()) else "INCOMPLETE_BINDING_COVERAGE"
     return reg
 def main()->int:
