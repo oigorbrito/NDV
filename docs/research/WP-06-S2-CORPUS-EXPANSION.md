@@ -26,6 +26,12 @@ The acquisition receipt is `ndv-p1-s2-parquet-acquisition-receipt-v2`; it record
 
 Acquisition is not performed by CI and has not yet been observed locally for Wave 01.
 
+## Frozen extraction environment
+
+`experiments/p1/s2-extraction-environment-v1.json` freezes the minimum materialization environment to Python 3.13.x and PyArrow 25.0.1. Network access during extraction is forbidden.
+
+The extractor checks the environment contract before reading rows and records the observed Python/PyArrow versions in its result. `tools/ndv_materialize_s2_wave.py` independently verifies the same contract and binds its SHA-256 into the materialization receipt.
+
 ## Byte-bound materialization gate
 
 `tools/ndv_materialize_s2_wave.py` is the only recommended post-acquisition entry point. It performs **no network access, Docker execution, model call, treatment, or holdout access**. Before extraction it revalidates:
@@ -34,9 +40,10 @@ Acquisition is not performed by CI and has not yet been observed locally for Wav
 - receipt → exact snapshot/contract file hashes;
 - receipt/source `source_id`, dataset, pinned revision, and Parquet path;
 - local Parquet size and SHA-256 against the frozen snapshot;
-- receipt expected/observed byte identity against the local Parquet.
+- receipt expected/observed byte identity against the local Parquet;
+- frozen extraction-environment schema/hash and exact Python/PyArrow versions.
 
-Only after those checks pass does it invoke the pinned extractor with quarantine. It then requires a complete `ndv-p1-s2-quarantine-aggregate-v2` where every Wave-01 candidate passed quarantine and writes `ndv-p1-s2-wave-materialization-receipt-v1`, binding the Parquet, acquisition receipt, wave file, extracted JSONL, and quarantine aggregate by SHA-256.
+Only after those checks pass does it invoke the pinned extractor with quarantine. It then requires a complete `ndv-p1-s2-quarantine-aggregate-v2` where every Wave-01 candidate passed quarantine and writes `ndv-p1-s2-wave-materialization-receipt-v2`, binding the Parquet, acquisition receipt, wave file, extraction environment, extracted JSONL, and quarantine aggregate by SHA-256.
 
 This separates network acquisition from corpus materialization while maintaining one cryptographic evidence chain.
 
@@ -49,6 +56,21 @@ The extractor verifies Parquet SHA-256 and frozen revision, rejects duplicate/in
 `tools/ndv_quarantine_swe_rebench_rows.py` accepts a complete ordered raw export or indexed extraction envelopes. Mixed modes, duplicate indices, identity mismatch, and original-index mismatch fail closed.
 
 For each candidate it produces `admission-only.json` (complete upstream row), `executor-visible.json` (strict allowlist projection), and `quarantine-manifest.json` (cryptographic binding). The executor allowlist is `instance_id`, `repo`, `base_commit`, `problem_statement`, and `language`. Known gold/grader fields (`patch`, `test_patch`, `FAIL_TO_PASS`, `PASS_TO_PASS`, `interface`, `meta`, `install_config`, `pr_description`) are never projected; unknown future fields default to admission-only.
+
+## Byte-bound base-audit planning
+
+`tools/ndv_prepare_s2_base_audit_plan.py` is the handoff between corpus materialization and Docker execution. It **does not run Docker**. It consumes a completed materialization receipt v2 and:
+
+1. revalidates the receipt → wave and receipt → quarantine-aggregate hashes;
+2. requires the exact six-candidate set from the frozen wave;
+3. re-reads every `admission-only.json` and `executor-visible.json`;
+4. recomputes full-row, task-statement, and executor-projection hashes;
+5. rechecks instance/repository/base-revision/original-row identity;
+6. freezes one exact `ndv_run_s2_base_audit.py` argv per candidate;
+7. leaves `image_digest=null` until the real base audit resolves the immutable Docker RepoDigest;
+8. records `authorized_action=PRE_SOLUTION_BASE_AUDIT_ONLY`, model execution `NONE`, treatment `NOT_EXECUTED`, holdout `NONE`.
+
+A materialized wave with altered admission bytes, altered executor projection, stale aggregate, missing candidate, duplicate candidate, or treatment/holdout contamination cannot produce `AUDIT_PLAN_READY`.
 
 ## Pre-solution base audit
 
@@ -78,15 +100,15 @@ python tools/ndv_validate_corpus_intake.py experiments/p1/s2-candidate-wave-01.j
 
 The validator requires unique non-negative `source_row_index` and unique `source_instance_id` values.
 
-CI is `.github/workflows/wp06-corpus-intake-validation.yml`. It compiles and tests acquisition, byte-bound materialization, extraction, original-index preservation, quarantine, base audit, oracle interpretation, verifier construction, audit validation, deterministic decision, and admission freeze. It performs no model calls, Parquet download, Docker candidate run, or treatment execution.
+CI is `.github/workflows/wp06-corpus-intake-validation.yml`. It compiles and tests acquisition, frozen extraction environment, byte-bound materialization, original-index preservation, quarantine, byte-bound base-audit planning, base audit, oracle interpretation, verifier construction, audit validation, deterministic decision, and admission freeze. It performs no model calls, Parquet download, Docker candidate run, or treatment execution.
 
-Latest validated tooling state: GitHub Actions run `35147820090` completed successfully.
+Latest validated tooling state: GitHub Actions run `35175245695` completed successfully.
 
 ## Current gate
 
-`PINNED_PARQUET_ACQUISITION_PASS → BYTE_BOUND_WAVE_MATERIALIZATION → INDEXED_FULL_ROW_EXTRACTION → QUARANTINE_PASS → HARNESS_VALID_BASE_RUN → EXPECTED_BASE_BEHAVIOR → HASHED_VERIFIER_EVIDENCE → AUDIT_PASS → SNAPSHOTTED_ADMISSION_DECISION → BYTE_VERIFIED_ADMITTED_FROZEN`.
+`PINNED_PARQUET_ACQUISITION_PASS → BYTE_BOUND_WAVE_MATERIALIZATION → QUARANTINE_PASS → AUDIT_PLAN_READY → HARNESS_VALID_BASE_RUN → EXPECTED_BASE_BEHAVIOR → HASHED_VERIFIER_EVIDENCE → AUDIT_PASS → SNAPSHOTTED_ADMISSION_DECISION → BYTE_VERIFIED_ADMITTED_FROZEN`.
 
-Current empirical state: the pinned Parquet has **not** been locally materialized/verified by NDV in this wave; no Wave-01 base Docker audit has been executed; no candidate is admitted; holdout access is `NONE`; treatment execution is `NOT_EXECUTED`.
+Current empirical state: the pinned Parquet has **not** been locally materialized/verified by NDV in this wave; therefore no real base-audit plan has yet been emitted from actual Wave-01 bytes, no Wave-01 Docker base audit has been executed, no candidate is admitted, holdout access is `NONE`, and treatment execution is `NOT_EXECUTED`.
 
 ## Stop conditions and claims
 
