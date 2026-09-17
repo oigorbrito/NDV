@@ -1,0 +1,112 @@
+{
+  "schema_id": "ndv-p1-wp07-development-comparison-protocol-v1",
+  "status": "PROSPECTIVE_FROZEN_NOT_RELEASED",
+  "authority": {
+    "legacy_repository": "oigorbrito/dv",
+    "legacy_commit": "66f3a218fba800daed5d86fdfce386491b8ab0e8",
+    "master_plan_ref": "docs/research/MASTER-TEST-PLAN-P1.md",
+    "run_spec_ref": "experiments/p1/run-spec-v1.template.json",
+    "accounting_ref": "experiments/p1/run-accounting-contract-v1.json",
+    "failure_attribution_ref": "experiments/p1/failure-attribution-v1.json"
+  },
+  "phase": "P1-S2",
+  "research_question": "Which preregistered executor/policy treatment minimizes complete system resource cost per verified solved task while preserving task success and reproducibility on the frozen development corpus?",
+  "primary_metric": "TOTAL_SYSTEM_TOKENS / VERIFIED_SOLVED_TASK",
+  "secondary_metrics": [
+    "TOTAL_MONETARY_COST / VERIFIED_SOLVED_TASK",
+    "WALL_CLOCK_LATENCY",
+    "VERIFIED_SOLVE_RATE",
+    "ESCALATION_RATE",
+    "RETRY_RATE",
+    "VERIFIER_COST",
+    "FAILURE_RATE",
+    "INCONCLUSIVE_RATE"
+  ],
+  "treatments": {
+    "B0": {"name": "STRONG_DIRECT", "policy": "one frozen strong executor, then verifier", "dynamic_routing": false},
+    "B1": {"name": "CHEAP_DIRECT_VERIFY", "policy": "one frozen economic executor, then verifier", "dynamic_routing": false},
+    "B2": {"name": "CHEAP_THEN_ESCALATE", "policy": "frozen cheap executor first; deterministic escalation only on preregistered trigger", "dynamic_routing": false},
+    "B3": {"name": "STATIC_FAMILY_POLICY", "policy": "executor chosen only from frozen task-family mapping", "dynamic_routing": false},
+    "B4": {"name": "LOCAL_OR_FREE_FIRST", "policy": "frozen local/free executor first; deterministic escalation only on preregistered trigger", "dynamic_routing": false}
+  },
+  "shaping": {
+    "S0_RAW_TASK": "minimally normalized frozen task statement",
+    "S1_DETERMINISTIC_TASK_SHAPING": "deterministic objective/constraints/scope/repository/verifier/environment/artifact projection; no LLM planning",
+    "initial_comparison_rule": "S0/S1 must be paired on the same task, treatment, binding, rollout, repetition, and matched environment when shaping is evaluated"
+  },
+  "escalation_triggers": [
+    "MISSING_CANDIDATE_BEFORE_TIMEOUT",
+    "EXPLICIT_EXECUTOR_BLOCKER",
+    "FOCAL_OR_PRESERVATION_FAILURE",
+    "STRUCTURALLY_INVALID_ARTIFACT",
+    "DETERMINISTIC_RESOURCE_CEILING"
+  ],
+  "forbidden_escalation_triggers": [
+    "SUBJECTIVE_DIFFICULTY",
+    "MANUAL_INTUITION",
+    "HIDDEN_REASONING_CLASSIFICATION",
+    "POST_HOC_MODEL_SELECTION"
+  ],
+  "run_unit": "frozen task x frozen treatment x frozen executor binding x frozen shaping x rollout/repetition",
+  "run_spec_requirements": {
+    "globally_unique_run_id": true,
+    "task_source": "ADMITTED_FROZEN_ONLY",
+    "task_solution_isolation": "SOLUTION_NOT_AVAILABLE_TO_EXECUTOR",
+    "executor_binding": "FROZEN_CONCRETE_REQUIRED",
+    "environment": "FROZEN_AND_RECORDED",
+    "budgets": "FROZEN_BEFORE_EXECUTION",
+    "retry_and_escalation_events": "INSIDE_RUN",
+    "usage": "AUTHORITATIVE_OR_EXPLICIT_MISSINGNESS",
+    "candidate_artifact": "REQUIRED",
+    "focal_and_preservation_verification": "REQUIRED"
+  },
+  "accounting": {
+    "partitions": ["routing", "task_shaping", "planning", "context_input", "execution", "escalation_handoff", "verification", "retry_replanning"],
+    "failure_cost_retained": true,
+    "inconclusive_cost_retained": true,
+    "free_local_not_zero_cost": true,
+    "hardware_time_to_token_conversion": "FORBIDDEN",
+    "no_composite_score": true
+  },
+  "failure_semantics": {
+    "verified_solved_requires": ["TASK_SATISFACTION", "PRESERVATION_PASS", "HARNESS_VALID"],
+    "valid_treatment_no_requires": "PRODUCT_FAILURE_WITH_VALID_EXECUTABLE_EVIDENCE",
+    "inconclusive_classes": ["HARNESS_FAILURE", "ORACLE_DEFECT", "ENVIRONMENT_DRIFT", "RESOURCE_LIMIT", "PROVIDER_FAILURE", "INCONCLUSIVE_OTHER"]
+  },
+  "execution_release": {
+    "required_release_schema": "ndv-p1-wp07-development-comparison-release-v1",
+    "required_release_status": "WP07_DEVELOPMENT_COMPARISON_RELEASED",
+    "development_only": true,
+    "sealed_holdout_access": false,
+    "claim_generation": false,
+    "architecture_decision": false
+  },
+  "matrix_materialization_rules": {
+    "materialize_only_after_release": true,
+    "all_tasks_must_be_admitted_frozen": true,
+    "all_treatment_bindings_must_be_concrete_and_hash_bound": true,
+    "no_silent_binding_substitution": true,
+    "no_unplanned_fallback": true,
+    "missing_binding_blocks_cell": true,
+    "blocked_cell_is_not_zero_cost": true,
+    "holdout_tasks_forbidden": true
+  },
+  "s2_rollout_policy": {
+    "repetitions_per_cell": 1,
+    "purpose": "development comparison and variance discovery",
+    "promotion": "P1-S3 repetition policy may be chosen only after S2 variance/resource review and then applied symmetrically"
+  },
+  "stop_conditions": [
+    "RELEASE_INVALIDATED",
+    "ADMISSION_RECORD_HASH_DRIFT",
+    "EXECUTOR_BINDING_DRIFT",
+    "VERIFIER_OR_ENVIRONMENT_DRIFT",
+    "HOLDOUT_CONTAMINATION",
+    "ACCOUNTING_INTEGRITY_FAILURE",
+    "UNPLANNED_FALLBACK"
+  ],
+  "claims_allowed": ["LIMITED_DEVELOPMENT_OBSERVATIONS"],
+  "claims_forbidden": ["HOLDOUT_CONFIRMATION", "UNIVERSAL_EXECUTOR_RANKING", "ARCHITECTURE_SUPERIORITY", "NDV_PRODUCT_JUSTIFICATION"],
+  "treatment_execution": "NOT_EXECUTED",
+  "holdout_access": "NONE"
+}
