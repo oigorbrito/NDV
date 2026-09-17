@@ -1,0 +1,33 @@
+{
+  "schema_id": "ndv-p1-wp07-execution-budgets-v1",
+  "status": "PROSPECTIVE_FROZEN_NOT_EXECUTED",
+  "phase": "P1-S2",
+  "purpose": "Freeze symmetric development-comparison resource ceilings before any P1-S2 treatment exposure.",
+  "principles": {
+    "same_executor_timeout_across_remote_codex_roles": true,
+    "retry_disabled": true,
+    "cascade_second_hop_only_for_preregistered_trigger": true,
+    "budget_exhaustion_is_not_product_failure": true,
+    "consumed_resources_retained_on_failure_or_inconclusive": true,
+    "post_hoc_budget_extension_forbidden": true
+  },
+  "executor_timeout_ms_per_hop": 1800000,
+  "verification_reserve_ms": 1800000,
+  "treatments": {
+    "B0": {"run_timeout_ms": 5400000, "retry_limit": 0, "escalation_limit": 0},
+    "B1": {"run_timeout_ms": 5400000, "retry_limit": 0, "escalation_limit": 0},
+    "B2": {"run_timeout_ms": 7200000, "retry_limit": 0, "escalation_limit": 1},
+    "B3": {"run_timeout_ms": 5400000, "retry_limit": 0, "escalation_limit": 0},
+    "B4": {"run_timeout_ms": 7200000, "retry_limit": 0, "escalation_limit": 1}
+  },
+  "interpretation": {
+    "executor_timeout": "Maximum wall-clock duration of each executor hop.",
+    "run_timeout": "Ceiling for complete treatment run including allowed hop(s), deterministic escalation handoff where applicable, and verification.",
+    "resource_limit_class": "RESOURCE_LIMIT",
+    "resource_limit_outcome": "INCONCLUSIVE"
+  },
+  "treatment_results_consulted": false,
+  "task_exposure": false,
+  "treatment_execution": "NOT_EXECUTED",
+  "holdout_access": "NONE"
+}
