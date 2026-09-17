@@ -57,6 +57,7 @@ def validate_record(path: Path) -> dict[str, Any]:
 
 
 def assess(intake_path: Path, legacy_path: Path, record_paths: list[Path]) -> dict[str, Any]:
+    intake_path, legacy_path = intake_path.resolve(), legacy_path.resolve()
     intake, legacy = load(intake_path), load(legacy_path)
     if intake.get("schema_id") != "ndv-p1-s2-corpus-intake-v1":
         raise ValueError("unexpected S2 intake contract")
@@ -72,7 +73,8 @@ def assess(intake_path: Path, legacy_path: Path, record_paths: list[Path]) -> di
     if not isinstance(counts, dict):
         raise ValueError("historical counts missing")
 
-    records = [validate_record(p.resolve()) for p in record_paths]
+    resolved_records = [p.resolve() for p in record_paths]
+    records = [validate_record(p) for p in resolved_records]
     ids = [r["candidate_id"] for r in records]
     instances = [r["source_instance_id"] for r in records]
     if len(ids) != len(set(ids)) or len(instances) != len(set(instances)):
@@ -84,9 +86,6 @@ def assess(intake_path: Path, legacy_path: Path, record_paths: list[Path]) -> di
     historical_tasks = int(counts.get("tasks", 0))
     combined_tasks = historical_tasks + len(records)
 
-    # Historical cutover already demonstrates the family/repository minima. Language
-    # was not frozen in the legacy manifest, so readiness proves language diversity
-    # conservatively from S2 admissions alone instead of inferring it after the fact.
     checks = {
         "task_target": combined_tasks >= int(target.get("initial_admitted_tasks", 0)),
         "family_minimum_historically_demonstrated": int(counts.get("families", 0)) >= int(target.get("minimum_families", 0)),
@@ -97,27 +96,22 @@ def assess(intake_path: Path, legacy_path: Path, record_paths: list[Path]) -> di
     return {
         "schema_id": "ndv-p1-s2-corpus-readiness-assessment-v1",
         "status": "WP06_INTAKE_TARGET_REACHED" if reached else "WP06_INTAKE_TARGET_NOT_REACHED",
+        "inputs": {
+            "intake_ref": str(intake_path), "intake_file_sha256": sha_file(intake_path),
+            "legacy_manifest_ref": str(legacy_path), "legacy_manifest_file_sha256": sha_file(legacy_path),
+        },
         "historical": {
-            "corpus_id": hist.get("corpus_id"),
-            "tasks": historical_tasks,
-            "families": counts.get("families"),
-            "repositories": counts.get("repositories"),
+            "corpus_id": hist.get("corpus_id"), "tasks": historical_tasks,
+            "families": counts.get("families"), "repositories": counts.get("repositories"),
         },
         "s2": {
-            "admitted_count": len(records),
-            "candidate_ids": sorted(ids),
-            "languages": s2_languages,
-            "families": s2_families,
-            "repositories": s2_repositories,
-            "records": [{"ref": str(p.resolve()), "file_sha256": sha_file(p.resolve()), "record_sha256": r["record_sha256"]} for p, r in zip(record_paths, records)],
+            "admitted_count": len(records), "candidate_ids": sorted(ids), "languages": s2_languages,
+            "families": s2_families, "repositories": s2_repositories,
+            "records": [{"ref": str(p), "file_sha256": sha_file(p), "record_sha256": r["record_sha256"]} for p, r in zip(resolved_records, records)],
         },
-        "combined_task_count": combined_tasks,
-        "target": target,
-        "checks": checks,
-        "comparative_corpus_ready": "NO",
-        "wp07_release": "NO",
-        "treatment_execution": "NOT_EXECUTED",
-        "holdout_access": "NONE",
+        "combined_task_count": combined_tasks, "target": target, "checks": checks,
+        "comparative_corpus_ready": "NO", "wp07_release": "NO",
+        "treatment_execution": "NOT_EXECUTED", "holdout_access": "NONE",
         "note": "Meeting WP-06 intake targets is necessary corpus acquisition evidence, not authorization for comparative P1 execution.",
     }
 
@@ -130,7 +124,7 @@ def main() -> int:
     ap.add_argument("--out", required=True, type=Path)
     args = ap.parse_args()
     try:
-        result = assess(args.intake.resolve(), args.legacy_manifest.resolve(), args.admission_record)
+        result = assess(args.intake, args.legacy_manifest, args.admission_record)
     except (OSError, ValueError, json.JSONDecodeError) as exc:
         print(json.dumps({"status": "FAIL", "reason": "CORPUS_READINESS_BLOCKED", "detail": str(exc)}, indent=2))
         return 2
