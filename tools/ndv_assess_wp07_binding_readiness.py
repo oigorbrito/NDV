@@ -53,6 +53,16 @@ def verify_binding(root:Path,role:str,b:dict[str,Any])->None:
         q=json.loads(qref.read_text(encoding="utf-8")); s=json.loads(sref.read_text(encoding="utf-8"))
         if q.get("execution_surface_file_sha256")!=b.get("execution_surface_file_sha256") or payload.get("execution_surface_file_sha256")!=b.get("execution_surface_file_sha256"): raise ValueError(f"{role}: execution surface chain mismatch")
         if s.get("schema_id")!="ndv-p1-wp07-codex-execution-surface-v1" or s.get("status")!="PROSPECTIVE_FROZEN_NOT_EXECUTED": raise ValueError(f"{role}: execution surface invalid")
+        qschema=q.get("schema_id")
+        if qschema!="ndv-p1-wp07-codex-subscription-qualification-v1":
+            aref=resolve(root,b.get("amendment_ref"),f"{role}.amendment_ref")
+            if sha_file(aref)!=b.get("amendment_file_sha256"): raise ValueError(f"{role}: amendment hash mismatch")
+            if q.get("amendment_file_sha256")!=b.get("amendment_file_sha256") or payload.get("amendment_file_sha256")!=b.get("amendment_file_sha256"): raise ValueError(f"{role}: amendment chain mismatch")
+            amendment=json.loads(aref.read_text(encoding="utf-8"))
+            cohort=str(q.get("qualification_cohort") or "").upper()
+            if amendment.get("schema_id")!=f"ndv-p1-wp07-codex-qualification-amendment-{cohort.lower()}": raise ValueError(f"{role}: amendment/cohort mismatch")
+            if cohort=="V4":
+                if b.get("windows_sandbox_backend")!="UNELEVATED" or payload.get("windows_sandbox_backend")!="UNELEVATED" or q.get("windows_sandbox_backend_requested")!="unelevated": raise ValueError(f"{role}: v4 Windows sandbox backend mismatch")
 def assess(registry_path:Path,artifact_root:Path)->dict[str,Any]:
     registry=json.loads(registry_path.read_text(encoding="utf-8"))
     if registry.get("schema_id")!="ndv-p1-wp07-treatment-bindings-v1": raise ValueError("unexpected registry schema")
