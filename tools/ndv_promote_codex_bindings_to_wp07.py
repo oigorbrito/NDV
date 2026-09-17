@@ -14,6 +14,8 @@ import json
 from pathlib import Path
 from typing import Any
 
+from ndv_wp07_codex_bundle import verify_bundle
+
 
 def sha_file(path: Path) -> str:
     h=hashlib.sha256()
@@ -26,9 +28,9 @@ def ref(path:Path,root:Path)->str:
     except ValueError: return str(path.resolve())
 
 def verify_dir(root:Path,expected_model:str,expected_candidate:str,required_roles:set[str])->dict[str,Any]:
+    sealed=verify_bundle(root,expected_model=expected_model,expected_candidate=expected_candidate)
+    q,b=sealed["qualification"],sealed["binding"]
     qpath=root.resolve()/"qualification.json"; bpath=root.resolve()/"executor-binding.json"
-    if not qpath.is_file() or not bpath.is_file(): raise ValueError(f"{root}: qualification.json and executor-binding.json required")
-    q,b=load(qpath),load(bpath)
     if q.get("schema_id")!="ndv-p1-wp07-codex-subscription-qualification-v1" or q.get("status")!="S0_READY": raise ValueError(f"{root}: S0_READY Codex qualification required")
     if b.get("schema_id")!="ndv-p1-wp07-executor-binding-v1" or b.get("status")!="QUALIFIED": raise ValueError(f"{root}: qualified WP-07 binding required")
     if q.get("candidate_id")!=expected_candidate or b.get("candidate_id")!=expected_candidate: raise ValueError(f"{root}: candidate mismatch")
@@ -38,10 +40,10 @@ def verify_dir(root:Path,expected_model:str,expected_candidate:str,required_role
     if b.get("auth_path")!="CHATGPT_SUBSCRIPTION" or b.get("api_key_routing_forbidden") is not True: raise ValueError(f"{root}: subscription auth provenance invalid")
     if b.get("dynamic_routing") is not False or b.get("implicit_fallback") is not False or b.get("retry_limit")!=0 or b.get("escalation_limit")!=0: raise ValueError(f"{root}: dynamic/retry policy invalid")
     if b.get("qualification_file_sha256")!=sha_file(qpath): raise ValueError(f"{root}: qualification hash mismatch")
-    return {"q":q,"b":b,"qpath":qpath,"bpath":bpath}
+    return {"q":q,"b":b,"qpath":qpath,"bpath":bpath,"manifest_path":sealed["manifest_path"]}
 def record(v:dict[str,Any],artifact_root:Path)->dict[str,Any]:
-    b,q=v["b"],v["q"]
-    return {"binding_id":b["binding_id"],"binding_ref":ref(v["bpath"],artifact_root),"binding_file_sha256":sha_file(v["bpath"]),"qualification_ref":ref(v["qpath"],artifact_root),"qualification_file_sha256":sha_file(v["qpath"]),"exact_executor_identity":b["exact_executor_identity"],"surface_class":"SUBSCRIPTION_EXECUTOR_PINNED"}
+    b=v["b"]
+    return {"binding_id":b["binding_id"],"binding_ref":ref(v["bpath"],artifact_root),"binding_file_sha256":sha_file(v["bpath"]),"qualification_ref":ref(v["qpath"],artifact_root),"qualification_file_sha256":sha_file(v["qpath"]),"evidence_manifest_ref":ref(v["manifest_path"],artifact_root),"evidence_manifest_sha256":sha_file(v["manifest_path"]),"exact_executor_identity":b["exact_executor_identity"],"surface_class":"SUBSCRIPTION_EXECUTOR_PINNED"}
 def promote(registry_path:Path,sol_dir:Path,luna_dir:Path,artifact_root:Path)->dict[str,Any]:
     reg=load(registry_path.resolve())
     if reg.get("schema_id")!="ndv-p1-wp07-treatment-bindings-v1" or reg.get("treatment_execution")!="NOT_EXECUTED" or reg.get("holdout_access")!="NONE": raise ValueError("registry invalid/contaminated")
@@ -56,9 +58,8 @@ def promote(registry_path:Path,sol_dir:Path,luna_dir:Path,artifact_root:Path)->d
     b4=t["B4"].setdefault("bindings",{})
     b4["ESCALATION_STRONG"]=srec
     t["B4"]["status"]="BOUND_READY" if "PRIMARY_LOCAL_OR_FREE" in b4 else "PARTIALLY_BOUND"
-    # B3 is intentionally unchanged; static family policy must be frozen separately.
     reg["status"]="INCOMPLETE_BINDING_COVERAGE" if any(x.get("status")!="BOUND_READY" for x in t.values()) else "ALL_TREATMENTS_BOUND"
-    reg["promotion_provenance"]={"codex_sol_binding_sha256":sha_file(sol["bpath"]),"codex_luna_binding_sha256":sha_file(luna["bpath"]),"automatic_roles":["B0.PRIMARY_STRONG","B1.PRIMARY_ECONOMIC","B2.PRIMARY_ECONOMIC","B2.ESCALATION_STRONG","B4.ESCALATION_STRONG"],"b3_automatic_promotion":False,"treatment_execution":"NOT_EXECUTED"}
+    reg["promotion_provenance"]={"codex_sol_binding_sha256":sha_file(sol["bpath"]),"codex_sol_evidence_manifest_sha256":sha_file(sol["manifest_path"]),"codex_luna_binding_sha256":sha_file(luna["bpath"]),"codex_luna_evidence_manifest_sha256":sha_file(luna["manifest_path"]),"automatic_roles":["B0.PRIMARY_STRONG","B1.PRIMARY_ECONOMIC","B2.PRIMARY_ECONOMIC","B2.ESCALATION_STRONG","B4.ESCALATION_STRONG"],"b3_automatic_promotion":False,"treatment_execution":"NOT_EXECUTED"}
     return reg
 def main()->int:
     ap=argparse.ArgumentParser(description=__doc__); ap.add_argument("--registry",type=Path,default=Path("experiments/p1/wp07-treatment-bindings-v1.json")); ap.add_argument("--sol-dir",required=True,type=Path); ap.add_argument("--luna-dir",required=True,type=Path); ap.add_argument("--artifact-root",type=Path,default=Path(".")); ap.add_argument("--out",required=True,type=Path); args=ap.parse_args()
