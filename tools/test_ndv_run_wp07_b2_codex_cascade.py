@@ -19,6 +19,20 @@ class B2CascadeTests(unittest.TestCase):
             "usage":{"status":"AUTHORITATIVE","total_system_tokens_component":tokens},
         }
 
+    def frozen_contract(self, root: Path) -> Path:
+        p=root/"contract.json"
+        p.write_text(json.dumps({"schema_id":mod.B2_SCHEMA,"status":"PROSPECTIVE_FROZEN_NOT_EXECUTED","treatment_id":"B2","hops":[{"index":1,"role":mod.PRIMARY,"model":"gpt-5.6-luna"},{"index":2,"role":mod.STRONG,"model":"gpt-5.6-sol"}],"retry_limit_per_hop":0,"escalation_limit":1,"dynamic_routing":False,"manual_override":False,"treatment_results_consulted":False,"task_exposure":False,"treatment_execution":"NOT_EXECUTED","holdout_access":"NONE"}))
+        return p
+
+    def budget(self, root: Path) -> Path:
+        p=root/"budget.json"
+        p.write_text(json.dumps({"schema_id":"ndv-p1-wp07-execution-budgets-v1","status":"PROSPECTIVE_FROZEN_NOT_EXECUTED","executor_timeout_ms_per_hop":1800000,"verification_reserve_ms":1800000,"treatments":{"B2":{"run_timeout_ms":7200000,"retry_limit":0,"escalation_limit":1}},"treatment_results_consulted":False,"task_exposure":False,"treatment_execution":"NOT_EXECUTED","holdout_access":"NONE"}))
+        return p
+
+    def preflight_pair(self, budget: Path):
+        common={"run_timeout_ms":7200000,"executor_timeout_ms":1800000,"budget_contract_ref":str(budget),"budget_contract_file_sha256":mod.sha_file(budget)}
+        return [{**common,"candidate_id":"CODEX-PLUS-GPT-5.6-LUNA"},{**common,"candidate_id":"CODEX-PLUS-GPT-5.6-SOL"}]
+
     def test_primary_yes_stops_without_escalation(self):
         with tempfile.TemporaryDirectory() as tmp:
             root=Path(tmp); stage=self.stage(root)
@@ -71,8 +85,7 @@ class B2CascadeTests(unittest.TestCase):
     def test_cascade_primary_yes_never_executes_sol(self, preflight, compile_prompt, materialize, execute_hop, verify):
         with tempfile.TemporaryDirectory() as tmp:
             root=Path(tmp); spec=root/"spec.json"; spec.write_text(json.dumps({"run_id":"R1","task":{"task_id":"T1"},"treatment":{"id":"B2"}}))
-            contract=root/"contract.json"; contract.write_text(json.dumps({"schema_id":mod.B2_SCHEMA,"status":"PROSPECTIVE_FROZEN_NOT_EXECUTED","treatment_id":"B2","hops":[{"index":1,"role":mod.PRIMARY,"model":"gpt-5.6-luna"},{"index":2,"role":mod.STRONG,"model":"gpt-5.6-sol"}],"retry_limit_per_hop":0,"escalation_limit":1,"dynamic_routing":False,"manual_override":False,"treatment_results_consulted":False,"task_exposure":False,"treatment_execution":"NOT_EXECUTED","holdout_access":"NONE"}))
-            preflight.side_effect=[{"candidate_id":"CODEX-PLUS-GPT-5.6-LUNA","run_timeout_ms":7200000,"executor_timeout_ms":1800000},{"candidate_id":"CODEX-PLUS-GPT-5.6-SOL","run_timeout_ms":7200000,"executor_timeout_ms":1800000}]
+            contract=self.frozen_contract(root); budget=self.budget(root); preflight.side_effect=self.preflight_pair(budget)
             compile_prompt.return_value={"prompt":"TASK\n"}
             def mat(_spec,_root,out): out.mkdir(parents=True); (out/"workspace-manifest.json").write_text("{}")
             materialize.side_effect=mat
@@ -81,6 +94,7 @@ class B2CascadeTests(unittest.TestCase):
             report=mod.cascade(spec,root,root,root/"out",contract,mod.EXECUTE_TOKEN,mod.VERIFY_TOKEN)
             self.assertEqual(report["verified_solved_task"],"YES")
             self.assertEqual(report["escalation_count"],0)
+            self.assertEqual(report["accounting"]["verification_reserve_ms"],1800000)
             self.assertEqual(execute_hop.call_count,1)
 
     @mock.patch.object(mod,"verify")
@@ -91,8 +105,7 @@ class B2CascadeTests(unittest.TestCase):
     def test_cascade_verified_no_escalates_exactly_once_to_sol(self, preflight, compile_prompt, materialize, execute_hop, verify):
         with tempfile.TemporaryDirectory() as tmp:
             root=Path(tmp); spec=root/"spec.json"; spec.write_text(json.dumps({"run_id":"R1","task":{"task_id":"T1"},"treatment":{"id":"B2"}}))
-            contract=root/"contract.json"; contract.write_text(json.dumps({"schema_id":mod.B2_SCHEMA,"status":"PROSPECTIVE_FROZEN_NOT_EXECUTED","treatment_id":"B2","hops":[{"index":1,"role":mod.PRIMARY,"model":"gpt-5.6-luna"},{"index":2,"role":mod.STRONG,"model":"gpt-5.6-sol"}],"retry_limit_per_hop":0,"escalation_limit":1,"dynamic_routing":False,"manual_override":False,"treatment_results_consulted":False,"task_exposure":False,"treatment_execution":"NOT_EXECUTED","holdout_access":"NONE"}))
-            preflight.side_effect=[{"candidate_id":"CODEX-PLUS-GPT-5.6-LUNA","run_timeout_ms":7200000,"executor_timeout_ms":1800000},{"candidate_id":"CODEX-PLUS-GPT-5.6-SOL","run_timeout_ms":7200000,"executor_timeout_ms":1800000}]
+            contract=self.frozen_contract(root); budget=self.budget(root); preflight.side_effect=self.preflight_pair(budget)
             compile_prompt.return_value={"prompt":"TASK\n"}
             def mat(_spec,_root,out): out.mkdir(parents=True); (out/"workspace-manifest.json").write_text("{}")
             materialize.side_effect=mat
@@ -103,6 +116,7 @@ class B2CascadeTests(unittest.TestCase):
             self.assertEqual(report["verified_solved_task"],"YES")
             self.assertEqual(report["escalation_count"],1)
             self.assertEqual(report["accounting"]["total_system_tokens"],300)
+            self.assertTrue(report["accounting"]["complete_system_wall_accounting"])
             self.assertEqual(execute_hop.call_count,2)
             self.assertEqual(materialize.call_count,2)
             self.assertEqual(execute_hop.call_args_list[1].args[4],mod.STRONG)
