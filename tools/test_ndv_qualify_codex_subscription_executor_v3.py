@@ -20,7 +20,7 @@ class QualifierV3Tests(unittest.TestCase):
     def test_invocation_adds_exact_workspace_root_before_prompt(self):
         with tempfile.TemporaryDirectory() as td:
             repo=Path(td).resolve()
-            surface={"fixed_flags":["--json","--sandbox","workspace-write"],"task_delivery":"FINAL_POSITIONAL_PROMPT"}
+            surface={"mode":"exec","fixed_flags":["--json","--sandbox","workspace-write"],"task_delivery":"FINAL_POSITIONAL_PROMPT"}
             argv=mod.invocation_v3(Path("codex.exe"),"gpt-5.6-luna","TASK",surface,repo)
             self.assertEqual(argv[-1],"TASK")
             i=argv.index("--add-dir")
