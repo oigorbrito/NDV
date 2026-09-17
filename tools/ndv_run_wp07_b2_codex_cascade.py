@@ -47,8 +47,7 @@ def escalation_from_primary(stage:dict[str,Any],verification:dict[str,Any]|None)
             return {"action":"ESCALATE","trigger":trigger}
         return {"action":"STOP_INCONCLUSIVE","trigger":None}
     candidate=stage.get("candidate") or {}
-    if candidate.get("diff_bytes")==0:
-        return {"action":"ESCALATE","trigger":"MISSING_CANDIDATE_BEFORE_TIMEOUT"}
+    if candidate.get("diff_bytes")==0:return {"action":"ESCALATE","trigger":"MISSING_CANDIDATE_BEFORE_TIMEOUT"}
     if not isinstance(verification,dict):raise ValueError("non-empty primary candidate requires verification before B2 decision")
     outcome=verification.get("verified_solved_task")
     if outcome=="YES":return {"action":"STOP_YES","trigger":None}
@@ -60,8 +59,7 @@ def escalation_from_primary(stage:dict[str,Any],verification:dict[str,Any]|None)
 
 def compact_failure_observations(verification:dict[str,Any]|None)->dict[str,Any]|None:
     if not isinstance(verification,dict):return None
-    ev=verification.get("decision_evidence") or {}
-    out={}
+    ev=verification.get("decision_evidence") or {};out={}
     for key in ("focal","preservation","failures","missing"):
         if key in ev:out[key]=ev[key]
     return out or None
@@ -100,8 +98,7 @@ def authoritative_tokens(stage:dict[str,Any])->int|None:
 
 def execute_hop(run_spec:Path,workspace_manifest:Path,artifact_root:Path,out_dir:Path,role:str,prompt:str,timeout_seconds:float)->dict[str,Any]:
     if out_dir.exists():raise ValueError(f"hop out-dir exists: {out_dir}")
-    pre=preflight_hop(run_spec.resolve(),artifact_root.resolve(),role)
-    ws=verify_workspace_manifest(workspace_manifest.resolve(),run_spec.resolve())
+    pre=preflight_hop(run_spec.resolve(),artifact_root.resolve(),role);ws=verify_workspace_manifest(workspace_manifest.resolve(),run_spec.resolve())
     out_dir.mkdir(parents=True);evidence=out_dir/"evidence";evidence.mkdir();prompt_path=evidence/"prompt.txt";prompt_path.write_text(prompt,encoding="utf-8")
     argv_template=list(pre["argv_template"])
     if not argv_template or argv_template[-1]!="<FROZEN_TASK_PROMPT>":raise ValueError("unsafe cascade argv template")
@@ -129,19 +126,17 @@ def execute_hop(run_spec:Path,workspace_manifest:Path,artifact_root:Path,out_dir
     status_path=evidence/"git-status.txt";diff_path=evidence/"candidate.diff";status_path.write_text(status_text,encoding="utf-8");diff_path.write_bytes(diff)
     classification=stage_classification(timed_out=timed_out,returncode=rc,usage=usage,accounting_error=accounting_error,candidate_bytes=len(diff))
     report={
-        "schema_id":"ndv-p1-wp07-codex-single-hop-run-v1","run_id":pre["run_id"],"treatment_id":"B2","task_id":ws["manifest"]["task_id"],"hop_role":role,
-        "binding_id":pre["binding_id"],"model":pre["model"],
+        "schema_id":"ndv-p1-wp07-codex-single-hop-run-v1","run_id":pre["run_id"],"treatment_id":"B2","task_id":ws["manifest"]["task_id"],"hop_role":role,"binding_id":pre["binding_id"],"model":pre["model"],
         "execution":{"started_at":started,"completed_at":completed,"wall_seconds":wall,"returncode":rc,"timed_out":timed_out,"executor_timeout_ms":int(timeout_seconds*1000),"frozen_executor_timeout_ms":pre["executor_timeout_ms"],"run_timeout_ms":pre["run_timeout_ms"],"retry_count":0,"escalation_count":0 if role==PRIMARY else 1,"argv_redacted":[*argv_template[:-1],"<FROZEN_TASK_PROMPT>"],"environment_variables_present_and_removed":sorted(removed)},
         "prompt":{"ref":str(prompt_path),"sha256":sha_file(prompt_path),"bytes":prompt_path.stat().st_size,"exposed_to_executor":True},
         "candidate":{"diff_ref":str(diff_path),"diff_sha256":sha_file(diff_path),"diff_bytes":len(diff),"git_status_ref":str(status_path),"git_status_sha256":sha_file(status_path),"capture_error":candidate_error},
-        "usage":usage,"usage_ref":str(usage_path),"usage_file_sha256":sha_file(usage_path),
-        "raw_evidence":{"stdout_ref":str(stdout_path),"stdout_sha256":sha_file(stdout_path),"stderr_ref":str(stderr_path),"stderr_sha256":sha_file(stderr_path)},
+        "usage":usage,"usage_ref":str(usage_path),"usage_file_sha256":sha_file(usage_path),"raw_evidence":{"stdout_ref":str(stdout_path),"stdout_sha256":sha_file(stdout_path),"stderr_ref":str(stderr_path),"stderr_sha256":sha_file(stderr_path)},
         "classification":classification,"verification":{"focal":"NOT_EXECUTED","preservation":"NOT_EXECUTED","final_treatment_outcome":"PENDING_VERIFICATION" if classification.get("pending_verification") else "INCONCLUSIVE_AT_EXECUTOR_STAGE"},
         "accounting":{"failure_cost_retained":True,"inconclusive_cost_retained":True,"missing_telemetry_is_zero":False,"total_system_tokens_component":usage.get("total_system_tokens_component") if isinstance(usage,dict) else None},
         "source_chain":{"run_spec_ref":str(run_spec.resolve()),"run_spec_file_sha256":sha_file(run_spec.resolve()),"workspace_manifest_ref":str(workspace_manifest.resolve()),"workspace_manifest_file_sha256":sha_file(workspace_manifest.resolve()),"execution_surface_ref":pre["execution_surface_ref"],"execution_surface_file_sha256":pre["execution_surface_file_sha256"],"budget_contract_ref":pre["budget_contract_ref"],"budget_contract_file_sha256":pre["budget_contract_file_sha256"]},
         "treatment_execution":"EXECUTOR_STAGE_EXECUTED_ONCE","holdout_access":"NONE",
     }
-    rp=out_dir/"executor-stage-report.json";rp.write_text(json.dumps(report,indent=2,sort_keys=True)+"\n",encoding="utf-8");return report
+    (out_dir/"executor-stage-report.json").write_text(json.dumps(report,indent=2,sort_keys=True)+"\n",encoding="utf-8");return report
 
 def cascade(run_spec:Path,artifact_root:Path,upstream_root:Path,out_dir:Path,contract_path:Path,execute_token:str,verify_token:str)->dict[str,Any]:
     if execute_token!=EXECUTE_TOKEN:raise ValueError("explicit frozen development execution token required")
@@ -151,44 +146,51 @@ def cascade(run_spec:Path,artifact_root:Path,upstream_root:Path,out_dir:Path,con
     if ((spec.get("treatment") or {}).get("id"))!="B2":raise ValueError("B2 run-spec required")
     primary_pre=preflight_hop(run_spec.resolve(),artifact_root.resolve(),PRIMARY);strong_pre=preflight_hop(run_spec.resolve(),artifact_root.resolve(),STRONG)
     if primary_pre.get("candidate_id")!="CODEX-PLUS-GPT-5.6-LUNA" or strong_pre.get("candidate_id")!="CODEX-PLUS-GPT-5.6-SOL":raise ValueError("B2 binding identities differ from frozen cascade contract")
-    compiled=compile_prompt(run_spec.resolve(),artifact_root.resolve());base_prompt=compiled["prompt"]
-    run_budget_ms=primary_pre["run_timeout_ms"];reserve_ms=(primary_pre["executor_timeout_ms"]);consumed_ms=0
-    out_dir.mkdir(parents=True);started=utc_now()
+    if primary_pre.get("budget_contract_file_sha256")!=strong_pre.get("budget_contract_file_sha256"):raise ValueError("B2 hops disagree on frozen budget contract")
+    budget_path=Path(primary_pre["budget_contract_ref"])
+    if not budget_path.is_file() or sha_file(budget_path)!=primary_pre["budget_contract_file_sha256"]:raise ValueError("B2 budget contract drift")
+    budget_contract=load(budget_path);reserve_ms=budget_contract.get("verification_reserve_ms")
+    if not isinstance(reserve_ms,int) or reserve_ms<=0:raise ValueError("positive frozen verification reserve required")
+    compiled=compile_prompt(run_spec.resolve(),artifact_root.resolve());base_prompt=compiled["prompt"];run_budget_ms=primary_pre["run_timeout_ms"]
+    out_dir.mkdir(parents=True);started=utc_now();run_t0=time.monotonic()
+    def remaining_ms()->int:return max(0,run_budget_ms-int((time.monotonic()-run_t0)*1000))
     pws_dir=out_dir/"hop1-workspace";materialize(run_spec.resolve(),artifact_root.resolve(),pws_dir);pws=pws_dir/"workspace-manifest.json"
-    p_timeout=min(primary_pre["executor_timeout_ms"],run_budget_ms-consumed_ms)/1000.0
-    primary=execute_hop(run_spec,pws,artifact_root,out_dir/"hop1-executor",PRIMARY,base_prompt,p_timeout);consumed_ms+=int((primary.get("execution") or {}).get("wall_seconds",0)*1000)
-    primary_ver=None
+    p_timeout=min(primary_pre["executor_timeout_ms"],remaining_ms())/1000.0
+    if p_timeout<=0:raise ValueError("B2 run budget exhausted before primary hop")
+    primary=execute_hop(run_spec,pws,artifact_root,out_dir/"hop1-executor",PRIMARY,base_prompt,p_timeout);primary_ver=None
     if (primary.get("classification") or {}).get("pending_verification") is True and (primary.get("candidate") or {}).get("diff_bytes",0)>0:
-        if run_budget_ms-consumed_ms<reserve_ms:
+        if remaining_ms()<reserve_ms:
             decision={"action":"STOP_INCONCLUSIVE","trigger":None};primary_ver={"verified_solved_task":"INCONCLUSIVE","failure_attribution":"RESOURCE_LIMIT","reason":"insufficient frozen run budget for first-hop verification"}
         else:
-            primary_ver=verify((out_dir/"hop1-executor"/"executor-stage-report.json"),artifact_root,upstream_root,out_dir/"hop1-verification",verify_token);consumed_ms+=int((primary_ver.get("verification") or {}).get("wall_seconds",0)*1000);decision=escalation_from_primary(primary,primary_ver)
+            primary_ver=verify((out_dir/"hop1-executor"/"executor-stage-report.json"),artifact_root,upstream_root,out_dir/"hop1-verification",verify_token);decision=escalation_from_primary(primary,primary_ver)
     else:decision=escalation_from_primary(primary,None)
     if decision["action"]=="STOP_YES":
         final="YES";failure=None;strong=None;strong_ver=None;handoff=None
     elif decision["action"]=="STOP_INCONCLUSIVE":
         final="INCONCLUSIVE";failure=(primary_ver or {}).get("failure_attribution") or (primary.get("classification") or {}).get("failure_attribution") or "INCONCLUSIVE_OTHER";strong=None;strong_ver=None;handoff=None
     else:
-        remaining=run_budget_ms-consumed_ms
+        remaining=remaining_ms()
         if remaining<=reserve_ms:
             final="INCONCLUSIVE";failure="RESOURCE_LIMIT";strong=None;strong_ver=None;handoff=None
         else:
-            handoff=build_handoff(base_prompt,primary,primary_ver,decision["trigger"],remaining);handoff_path=out_dir/"handoff.json";handoff_path.write_text(json.dumps({k:v for k,v in handoff.items() if k!="prompt"},indent=2,sort_keys=True)+"\n",encoding="utf-8")
+            handoff=build_handoff(base_prompt,primary,primary_ver,decision["trigger"],remaining);(out_dir/"handoff.json").write_text(json.dumps({k:v for k,v in handoff.items() if k!="prompt"},indent=2,sort_keys=True)+"\n",encoding="utf-8")
             sws_dir=out_dir/"hop2-workspace";materialize(run_spec.resolve(),artifact_root.resolve(),sws_dir);sws=sws_dir/"workspace-manifest.json"
-            strong_timeout=min(strong_pre["executor_timeout_ms"],max(0,remaining-reserve_ms))/1000.0
+            strong_timeout=min(strong_pre["executor_timeout_ms"],max(0,remaining_ms()-reserve_ms))/1000.0
             if strong_timeout<=0:
                 final="INCONCLUSIVE";failure="RESOURCE_LIMIT";strong=None;strong_ver=None
             else:
-                strong=execute_hop(run_spec,sws,artifact_root,out_dir/"hop2-executor",STRONG,handoff["prompt"],strong_timeout);consumed_ms+=int((strong.get("execution") or {}).get("wall_seconds",0)*1000);remaining2=run_budget_ms-consumed_ms
+                strong=execute_hop(run_spec,sws,artifact_root,out_dir/"hop2-executor",STRONG,handoff["prompt"],strong_timeout)
                 if (strong.get("classification") or {}).get("pending_verification") is not True:
                     final="INCONCLUSIVE";failure=(strong.get("classification") or {}).get("failure_attribution") or "INCONCLUSIVE_OTHER";strong_ver=None
-                elif remaining2<=0:
+                elif remaining_ms()<reserve_ms:
                     final="INCONCLUSIVE";failure="RESOURCE_LIMIT";strong_ver=None
                 else:
-                    strong_ver=verify((out_dir/"hop2-executor"/"executor-stage-report.json"),artifact_root,upstream_root,out_dir/"hop2-verification",verify_token);consumed_ms+=int((strong_ver.get("verification") or {}).get("wall_seconds",0)*1000);final=strong_ver.get("verified_solved_task");failure=strong_ver.get("failure_attribution")
+                    strong_ver=verify((out_dir/"hop2-executor"/"executor-stage-report.json"),artifact_root,upstream_root,out_dir/"hop2-verification",verify_token);final=strong_ver.get("verified_solved_task");failure=strong_ver.get("failure_attribution")
     tokens=[authoritative_tokens(x) for x in (primary,strong) if isinstance(x,dict)];all_authoritative=all(x is not None for x in tokens);total_tokens=sum(tokens) if all_authoritative else None
     if not all_authoritative:final="INCONCLUSIVE";failure=failure or "INCONCLUSIVE_OTHER"
-    report={"schema_id":"ndv-p1-wp07-b2-cascade-run-v1","run_id":spec.get("run_id"),"task_id":((spec.get("task") or {}).get("task_id")),"treatment_id":"B2","started_at":started,"completed_at":utc_now(),"verified_solved_task":final,"failure_attribution":failure,"escalation_count":1 if isinstance(strong,dict) else 0,"retry_count":0,"decision_after_primary":decision,"primary_executor_ref":str(out_dir/"hop1-executor"/"executor-stage-report.json"),"primary_verification_ref":str(out_dir/"hop1-verification"/"verification-report.json") if primary_ver else None,"strong_executor_ref":str(out_dir/"hop2-executor"/"executor-stage-report.json") if isinstance(strong,dict) else None,"strong_verification_ref":str(out_dir/"hop2-verification"/"verification-report.json") if strong_ver else None,"handoff":{"certificate":handoff["certificate"],"certificate_sha256":handoff["certificate_sha256"],"diff_text_sha256":handoff["diff_text_sha256"]} if isinstance(handoff,dict) else None,"accounting":{"consumed_wall_ms":consumed_ms,"run_timeout_ms":run_budget_ms,"total_system_tokens":total_tokens,"all_consumed_hop_usage_authoritative":all_authoritative,"missing_telemetry_is_zero":False,"failure_cost_retained":True,"inconclusive_cost_retained":True},"source_chain":{"run_spec_ref":str(run_spec.resolve()),"run_spec_file_sha256":sha_file(run_spec.resolve()),"b2_contract_ref":str(contract_path.resolve()),"b2_contract_file_sha256":sha_file(contract_path.resolve())},"treatment_execution":"COMPLETE_B2_CASCADE","holdout_access":"NONE"}
+    consumed_wall_ms=int((time.monotonic()-run_t0)*1000)
+    pver_path=out_dir/"hop1-verification"/"verification-report.json";sver_path=out_dir/"hop2-verification"/"verification-report.json"
+    report={"schema_id":"ndv-p1-wp07-b2-cascade-run-v1","run_id":spec.get("run_id"),"task_id":((spec.get("task") or {}).get("task_id")),"treatment_id":"B2","started_at":started,"completed_at":utc_now(),"verified_solved_task":final,"failure_attribution":failure,"escalation_count":1 if isinstance(strong,dict) else 0,"retry_count":0,"decision_after_primary":decision,"primary_executor_ref":str(out_dir/"hop1-executor"/"executor-stage-report.json"),"primary_verification_ref":str(pver_path) if pver_path.is_file() else None,"strong_executor_ref":str(out_dir/"hop2-executor"/"executor-stage-report.json") if isinstance(strong,dict) else None,"strong_verification_ref":str(sver_path) if sver_path.is_file() else None,"handoff":{"certificate":handoff["certificate"],"certificate_sha256":handoff["certificate_sha256"],"diff_text_sha256":handoff["diff_text_sha256"]} if isinstance(handoff,dict) else None,"accounting":{"consumed_wall_ms":consumed_wall_ms,"run_timeout_ms":run_budget_ms,"verification_reserve_ms":reserve_ms,"total_system_tokens":total_tokens,"all_consumed_hop_usage_authoritative":all_authoritative,"missing_telemetry_is_zero":False,"failure_cost_retained":True,"inconclusive_cost_retained":True,"complete_system_wall_accounting":True},"source_chain":{"run_spec_ref":str(run_spec.resolve()),"run_spec_file_sha256":sha_file(run_spec.resolve()),"b2_contract_ref":str(contract_path.resolve()),"b2_contract_file_sha256":sha_file(contract_path.resolve()),"budget_contract_ref":str(budget_path.resolve()),"budget_contract_file_sha256":sha_file(budget_path)},"treatment_execution":"COMPLETE_B2_CASCADE","holdout_access":"NONE"}
     (out_dir/"cascade-report.json").write_text(json.dumps(report,indent=2,sort_keys=True)+"\n",encoding="utf-8");return report
 
 def main()->int:
