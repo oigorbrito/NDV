@@ -1,0 +1,74 @@
+{
+  "schema_id": "ndv-p1-wp07-treatment-bindings-v1",
+  "status": "INCOMPLETE_BINDING_COVERAGE",
+  "purpose": "Prospective registry of concrete executor bindings required before WP-07 P1-S2 run-spec materialization.",
+  "binding_rules": {
+    "concrete_binding_required": true,
+    "binding_bytes_must_be_preserved": true,
+    "binding_file_sha256_required": true,
+    "qualification_evidence_required": true,
+    "silent_substitution_forbidden": true,
+    "dynamic_provider_routing_forbidden": true,
+    "missing_binding_blocks_cell": true,
+    "blocked_cell_is_not_a_run": true,
+    "blocked_cell_cost_is_not_zero": true
+  },
+  "treatments": {
+    "B0": {
+      "name": "STRONG_DIRECT",
+      "required_roles": ["PRIMARY_STRONG"],
+      "bindings": {},
+      "status": "UNBOUND"
+    },
+    "B1": {
+      "name": "CHEAP_DIRECT_VERIFY",
+      "required_roles": ["PRIMARY_ECONOMIC"],
+      "bindings": {},
+      "status": "UNBOUND"
+    },
+    "B2": {
+      "name": "CHEAP_THEN_ESCALATE",
+      "required_roles": ["PRIMARY_ECONOMIC", "ESCALATION_STRONG"],
+      "bindings": {},
+      "status": "UNBOUND"
+    },
+    "B3": {
+      "name": "STATIC_FAMILY_POLICY",
+      "required_roles": ["FAMILY_POLICY_MAP"],
+      "bindings": {},
+      "family_policy": {},
+      "status": "UNBOUND"
+    },
+    "B4": {
+      "name": "LOCAL_OR_FREE_FIRST",
+      "required_roles": ["PRIMARY_LOCAL_OR_FREE", "ESCALATION_STRONG"],
+      "bindings": {},
+      "status": "UNBOUND"
+    }
+  },
+  "binding_record_contract": {
+    "required_fields": [
+      "binding_id",
+      "binding_ref",
+      "binding_file_sha256",
+      "qualification_ref",
+      "qualification_file_sha256",
+      "exact_executor_identity",
+      "surface_class"
+    ],
+    "surface_classes": [
+      "STRONG_REMOTE_PINNED",
+      "ECONOMIC_REMOTE_PINNED",
+      "LOCAL_PINNED",
+      "HOSTED_FREE_PINNED",
+      "SUBSCRIPTION_EXECUTOR_PINNED"
+    ]
+  },
+  "known_empirical_context": {
+    "wp04_local_surface": "Aider 0.86.2 + qwen2.5-coder:3b was smoke-qualified/executed but its original binding bytes must be preserved before reuse.",
+    "strong_remote": "No currently released concrete strong binding is asserted here.",
+    "economic_remote": "No currently released concrete economic binding is asserted here."
+  },
+  "treatment_execution": "NOT_EXECUTED",
+  "holdout_access": "NONE"
+}
