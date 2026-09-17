@@ -7,6 +7,7 @@ on:
       - 'experiments/p1/wp07-treatment-bindings-v1.json'
       - 'experiments/p1/wp07-executor-role-qualification-v1.json'
       - 'experiments/p1/wp07-static-family-policy-v1.json'
+      - 'experiments/p1/wp07-codex-execution-surface-v1.json'
       - 'tools/ndv_validate_wp07_protocol.py'
       - 'tools/test_ndv_validate_wp07_protocol.py'
       - 'tools/ndv_assess_wp07_binding_readiness.py'
@@ -38,6 +39,7 @@ on:
       - 'experiments/p1/wp07-treatment-bindings-v1.json'
       - 'experiments/p1/wp07-executor-role-qualification-v1.json'
       - 'experiments/p1/wp07-static-family-policy-v1.json'
+      - 'experiments/p1/wp07-codex-execution-surface-v1.json'
       - 'tools/ndv_validate_wp07_protocol.py'
       - 'tools/test_ndv_validate_wp07_protocol.py'
       - 'tools/ndv_assess_wp07_binding_readiness.py'
@@ -92,6 +94,8 @@ jobs:
           python -m py_compile tools/ndv_release_wp07_development_comparison.py
       - name: Validate frozen comparison protocol
         run: python tools/ndv_validate_wp07_protocol.py experiments/p1/wp07-development-comparison-protocol-v1.json
+      - name: Validate frozen Codex execution surface contract
+        run: python -c "import json,pathlib; p=pathlib.Path('experiments/p1/wp07-codex-execution-surface-v1.json'); x=json.loads(p.read_text()); assert x['schema_id']=='ndv-p1-wp07-codex-execution-surface-v1'; assert x['status']=='PROSPECTIVE_FROZEN_NOT_EXECUTED'; assert x['holdout_access']=='NONE'; assert x['treatment_execution']=='NOT_EXECUTED'"
       - name: Validate executor role qualification program without task exposure
         run: python tools/ndv_probe_wp07_subscription_surfaces.py
       - name: Assess current binding coverage
