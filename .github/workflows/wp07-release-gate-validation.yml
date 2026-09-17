@@ -5,10 +5,13 @@ on:
     paths:
       - 'experiments/p1/wp07-development-comparison-protocol-v1.json'
       - 'experiments/p1/wp07-treatment-bindings-v1.json'
+      - 'experiments/p1/wp07-executor-role-qualification-v1.json'
       - 'tools/ndv_validate_wp07_protocol.py'
       - 'tools/test_ndv_validate_wp07_protocol.py'
       - 'tools/ndv_assess_wp07_binding_readiness.py'
       - 'tools/test_ndv_assess_wp07_binding_readiness.py'
+      - 'tools/ndv_probe_wp07_subscription_surfaces.py'
+      - 'tools/test_ndv_probe_wp07_subscription_surfaces.py'
       - 'tools/ndv_promote_wp04_binding_to_wp07.py'
       - 'tools/test_ndv_promote_wp04_binding_to_wp07.py'
       - 'tools/ndv_wp07_preflight.py'
@@ -22,10 +25,13 @@ on:
     paths:
       - 'experiments/p1/wp07-development-comparison-protocol-v1.json'
       - 'experiments/p1/wp07-treatment-bindings-v1.json'
+      - 'experiments/p1/wp07-executor-role-qualification-v1.json'
       - 'tools/ndv_validate_wp07_protocol.py'
       - 'tools/test_ndv_validate_wp07_protocol.py'
       - 'tools/ndv_assess_wp07_binding_readiness.py'
       - 'tools/test_ndv_assess_wp07_binding_readiness.py'
+      - 'tools/ndv_probe_wp07_subscription_surfaces.py'
+      - 'tools/test_ndv_probe_wp07_subscription_surfaces.py'
       - 'tools/ndv_promote_wp04_binding_to_wp07.py'
       - 'tools/test_ndv_promote_wp04_binding_to_wp07.py'
       - 'tools/ndv_wp07_preflight.py'
@@ -52,12 +58,15 @@ jobs:
         run: |
           python -m py_compile tools/ndv_validate_wp07_protocol.py
           python -m py_compile tools/ndv_assess_wp07_binding_readiness.py
+          python -m py_compile tools/ndv_probe_wp07_subscription_surfaces.py
           python -m py_compile tools/ndv_promote_wp04_binding_to_wp07.py
           python -m py_compile tools/ndv_wp07_preflight.py
           python -m py_compile tools/ndv_materialize_wp07_run_matrix.py
           python -m py_compile tools/ndv_release_wp07_development_comparison.py
       - name: Validate frozen comparison protocol
         run: python tools/ndv_validate_wp07_protocol.py experiments/p1/wp07-development-comparison-protocol-v1.json
+      - name: Validate executor role qualification program without task exposure
+        run: python tools/ndv_probe_wp07_subscription_surfaces.py
       - name: Assess current binding coverage
         run: python tools/ndv_assess_wp07_binding_readiness.py --registry experiments/p1/wp07-treatment-bindings-v1.json
       - name: Test WP-07 gates
@@ -65,6 +74,7 @@ jobs:
         run: |
           python -m unittest -v test_ndv_validate_wp07_protocol.py
           python -m unittest -v test_ndv_assess_wp07_binding_readiness.py
+          python -m unittest -v test_ndv_probe_wp07_subscription_surfaces.py
           python -m unittest -v test_ndv_promote_wp04_binding_to_wp07.py
           python -m unittest -v test_ndv_wp07_preflight.py
           python -m unittest -v test_ndv_materialize_wp07_run_matrix.py
