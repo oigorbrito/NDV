@@ -24,6 +24,8 @@ on:
       - 'tools/test_ndv_promote_codex_bindings_to_wp07.py'
       - 'tools/ndv_freeze_wp07_b3_family_policy.py'
       - 'tools/test_ndv_freeze_wp07_b3_family_policy.py'
+      - 'tools/ndv_preflight_wp07_codex_run_spec.py'
+      - 'tools/test_ndv_preflight_wp07_codex_run_spec.py'
       - 'tools/ndv_promote_wp04_binding_to_wp07.py'
       - 'tools/test_ndv_promote_wp04_binding_to_wp07.py'
       - 'tools/ndv_wp07_preflight.py'
@@ -56,6 +58,8 @@ on:
       - 'tools/test_ndv_promote_codex_bindings_to_wp07.py'
       - 'tools/ndv_freeze_wp07_b3_family_policy.py'
       - 'tools/test_ndv_freeze_wp07_b3_family_policy.py'
+      - 'tools/ndv_preflight_wp07_codex_run_spec.py'
+      - 'tools/test_ndv_preflight_wp07_codex_run_spec.py'
       - 'tools/ndv_promote_wp04_binding_to_wp07.py'
       - 'tools/test_ndv_promote_wp04_binding_to_wp07.py'
       - 'tools/ndv_wp07_preflight.py'
@@ -88,6 +92,7 @@ jobs:
           python -m py_compile tools/ndv_batch_qualify_codex_subscription.py
           python -m py_compile tools/ndv_promote_codex_bindings_to_wp07.py
           python -m py_compile tools/ndv_freeze_wp07_b3_family_policy.py
+          python -m py_compile tools/ndv_preflight_wp07_codex_run_spec.py
           python -m py_compile tools/ndv_promote_wp04_binding_to_wp07.py
           python -m py_compile tools/ndv_wp07_preflight.py
           python -m py_compile tools/ndv_materialize_wp07_run_matrix.py
@@ -111,6 +116,7 @@ jobs:
           python -m unittest -v test_ndv_batch_qualify_codex_subscription.py
           python -m unittest -v test_ndv_promote_codex_bindings_to_wp07.py
           python -m unittest -v test_ndv_freeze_wp07_b3_family_policy.py
+          python -m unittest -v test_ndv_preflight_wp07_codex_run_spec.py
           python -m unittest -v test_ndv_promote_wp04_binding_to_wp07.py
           python -m unittest -v test_ndv_wp07_preflight.py
           python -m unittest -v test_ndv_materialize_wp07_run_matrix.py
