@@ -9,6 +9,10 @@ on:
       - 'tools/test_ndv_validate_wp07_protocol.py'
       - 'tools/ndv_assess_wp07_binding_readiness.py'
       - 'tools/test_ndv_assess_wp07_binding_readiness.py'
+      - 'tools/ndv_promote_wp04_binding_to_wp07.py'
+      - 'tools/test_ndv_promote_wp04_binding_to_wp07.py'
+      - 'tools/ndv_wp07_preflight.py'
+      - 'tools/test_ndv_wp07_preflight.py'
       - 'tools/ndv_materialize_wp07_run_matrix.py'
       - 'tools/test_ndv_materialize_wp07_run_matrix.py'
       - 'tools/ndv_release_wp07_development_comparison.py'
@@ -22,6 +26,10 @@ on:
       - 'tools/test_ndv_validate_wp07_protocol.py'
       - 'tools/ndv_assess_wp07_binding_readiness.py'
       - 'tools/test_ndv_assess_wp07_binding_readiness.py'
+      - 'tools/ndv_promote_wp04_binding_to_wp07.py'
+      - 'tools/test_ndv_promote_wp04_binding_to_wp07.py'
+      - 'tools/ndv_wp07_preflight.py'
+      - 'tools/test_ndv_wp07_preflight.py'
       - 'tools/ndv_materialize_wp07_run_matrix.py'
       - 'tools/test_ndv_materialize_wp07_run_matrix.py'
       - 'tools/ndv_release_wp07_development_comparison.py'
@@ -44,6 +52,8 @@ jobs:
         run: |
           python -m py_compile tools/ndv_validate_wp07_protocol.py
           python -m py_compile tools/ndv_assess_wp07_binding_readiness.py
+          python -m py_compile tools/ndv_promote_wp04_binding_to_wp07.py
+          python -m py_compile tools/ndv_wp07_preflight.py
           python -m py_compile tools/ndv_materialize_wp07_run_matrix.py
           python -m py_compile tools/ndv_release_wp07_development_comparison.py
       - name: Validate frozen comparison protocol
@@ -55,5 +65,7 @@ jobs:
         run: |
           python -m unittest -v test_ndv_validate_wp07_protocol.py
           python -m unittest -v test_ndv_assess_wp07_binding_readiness.py
+          python -m unittest -v test_ndv_promote_wp04_binding_to_wp07.py
+          python -m unittest -v test_ndv_wp07_preflight.py
           python -m unittest -v test_ndv_materialize_wp07_run_matrix.py
           python -m unittest -v test_ndv_release_wp07_development_comparison.py
