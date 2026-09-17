@@ -51,32 +51,43 @@ class Stage2GateTests(unittest.TestCase):
             (root / "import-manifest.json").write_text(json.dumps({"schema_id": "ndv-wp04-import-manifest-v1"}), encoding="utf-8")
         return root
 
-    def make_binding_import(self, stage1: Path, *, binding_id="B1", reconstructed=False) -> Path:
+    def make_binding_import(self, stage1: Path, *, binding_id="B1", reconstructed=False, tamper_qualification=False) -> Path:
         root = stage1.parent / (stage1.name + "-binding")
         root.mkdir()
+        qualification = {"status": "S0_READY", "surface": "aider+ollama"}
+        qualification_bytes = (json.dumps(qualification, sort_keys=True) + "\n").encode()
         binding = {
             "schema_id": "ndv-p1-wp04-executor-binding-v2",
             "status": "QUALIFIED",
             "binding_id": binding_id,
             "exact_executor_identity": "aider(aider 0.86.2)+qwen2.5-coder:3b",
+            "qualification_evidence_sha256": sha(qualification_bytes),
         }
         binding_bytes = (json.dumps(binding, sort_keys=True) + "\n").encode()
         (root / "executor-binding-v2.json").write_bytes(binding_bytes)
+        (root / "qualification-evidence.json").write_bytes(qualification_bytes)
         report_path = stage1 / "run-report.json"
         receipt = {
-            "schema_id": "ndv-wp04-binding-import-receipt-v1",
-            "status": "ORIGINAL_BINDING_PRESERVED",
+            "schema_id": "ndv-wp04-binding-import-receipt-v2",
+            "status": "ORIGINAL_BINDING_AND_QUALIFICATION_PRESERVED",
             "binding_id": binding_id,
             "exact_executor_identity": binding["exact_executor_identity"],
             "preserved_binding_ref": "executor-binding-v2.json",
             "binding_file_sha256": sha(binding_bytes),
             "binding_file_size_bytes": len(binding_bytes),
+            "preserved_qualification_ref": "qualification-evidence.json",
+            "qualification_file_sha256": sha(qualification_bytes),
+            "qualification_file_size_bytes": len(qualification_bytes),
+            "binding_declared_qualification_sha256": sha(qualification_bytes),
             "stage1_report_sha256": mod.sha256_file(report_path),
             "treatment_reexecuted": False,
             "binding_reconstructed": reconstructed,
+            "qualification_reconstructed": False,
             "holdout_access": "NONE",
         }
         (root / "binding-import-receipt.json").write_text(json.dumps(receipt), encoding="utf-8")
+        if tamper_qualification:
+            (root / "qualification-evidence.json").write_text("{}", encoding="utf-8")
         return root
 
     def test_valid_import_passes(self):
@@ -119,7 +130,7 @@ class Stage2GateTests(unittest.TestCase):
         binding_dir = self.make_binding_import(stage1)
         binding, receipt, binding_path = mod.load_preserved_binding(binding_dir, stage1)
         self.assertEqual(binding["binding_id"], "B1")
-        self.assertEqual(receipt["status"], "ORIGINAL_BINDING_PRESERVED")
+        self.assertEqual(receipt["status"], "ORIGINAL_BINDING_AND_QUALIFICATION_PRESERVED")
         self.assertEqual(binding_path.name, "executor-binding-v2.json")
 
     def test_tampered_preserved_binding_is_rejected(self):
@@ -127,6 +138,12 @@ class Stage2GateTests(unittest.TestCase):
         binding_dir = self.make_binding_import(stage1)
         (binding_dir / "executor-binding-v2.json").write_text("{}", encoding="utf-8")
         with self.assertRaisesRegex(ValueError, "hash/size mismatch"):
+            mod.load_preserved_binding(binding_dir, stage1)
+
+    def test_tampered_preserved_qualification_is_rejected(self):
+        stage1 = self.make_import()
+        binding_dir = self.make_binding_import(stage1, tamper_qualification=True)
+        with self.assertRaisesRegex(ValueError, "qualification evidence hash/size mismatch"):
             mod.load_preserved_binding(binding_dir, stage1)
 
     def test_reconstructed_binding_receipt_is_rejected(self):
