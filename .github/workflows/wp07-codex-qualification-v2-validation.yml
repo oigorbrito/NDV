@@ -14,6 +14,7 @@ on:
       - 'tools/test_ndv_qualify_codex_subscription_executor_v3.py'
       - 'tools/ndv_qualify_codex_subscription_executor_v4.py'
       - 'tools/test_ndv_qualify_codex_subscription_executor_v4.py'
+      - 'tools/test_ndv_wp07_codex_v4_promotion.py'
       - '.github/workflows/wp07-codex-qualification-v2-validation.yml'
   pull_request:
     paths:
@@ -83,3 +84,4 @@ jobs:
           python -m unittest -v test_ndv_qualify_codex_subscription_executor_v2.py
           python -m unittest -v test_ndv_qualify_codex_subscription_executor_v3.py
           python -m unittest -v test_ndv_qualify_codex_subscription_executor_v4.py
+          python -m unittest -v test_ndv_wp07_codex_v4_promotion.py
