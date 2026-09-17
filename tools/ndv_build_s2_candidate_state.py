@@ -38,7 +38,10 @@ def build(wave_path:Path, materialization_receipt:Path)->dict[str,Any]:
     for c in candidates:
         cid=c['candidate_id']; m=by_id[cid]
         if m.get('status')!='PASS' or m.get('treatment_execution')!='NOT_EXECUTED' or m.get('holdout_access')!='NONE': raise ValueError(f'{cid}: quarantine not clean/pass')
-        admission=require_file(Path(m['admission_only_ref']),f'{cid} admission-only'); executor=require_file(Path(m['executor_visible_ref']),f'{cid} executor-visible'); a,e=load(admission),load(executor)
+        admission=require_file(Path(m['admission_only_ref']),f'{cid} admission-only'); executor=require_file(Path(m['executor_visible_ref']),f'{cid} executor-visible')
+        manifest_path=require_file(admission.parent/'quarantine-manifest.json',f'{cid} quarantine manifest')
+        if load(manifest_path)!=m: raise ValueError(f'{cid}: aggregate manifest differs from preserved quarantine manifest')
+        a,e=load(admission),load(executor)
         if a.get('candidate_id')!=cid or e.get('candidate_id')!=cid: raise ValueError(f'{cid}: artifact identity mismatch')
         source=a.get('source') or {}; binding=e.get('source_binding') or {}
         for field,val in [('source_row_index',c.get('source_row_index')),('source_instance_id',c.get('source_instance_id'))]:
@@ -48,7 +51,7 @@ def build(wave_path:Path, materialization_receipt:Path)->dict[str,Any]:
         out.append({
             'candidate_id':cid,'source_id':wave.get('source',{}).get('source_id'),'source_instance_id':c.get('source_instance_id'),'source_row_index':c.get('source_row_index'),'repository':c.get('repository'),'base_revision':c.get('base_revision'),'language':c.get('language'),'image_ref':c.get('image_ref'),'task_statement_ref':c.get('task_statement_ref'),
             'task_statement_sha256':task,'ndv_canonical_row_sha256':raw,'executor_visible_sha256':projection,
-            'quarantine_manifest_ref':m.get('manifest_ref') or m.get('quarantine_manifest_ref'),'admission_only_ref':str(admission),'executor_visible_ref':str(executor),
+            'quarantine_manifest_ref':str(manifest_path),'quarantine_manifest_file_sha256':sha256_file(manifest_path),'admission_only_ref':str(admission),'executor_visible_ref':str(executor),
             'quarantine_status':'PASS','solution_isolation':'PROVEN','solution_isolation_basis':'STRICT_EXECUTOR_VISIBLE_ALLOWLIST_AND_QUARANTINE_PASS',
             'proposed_family':'UNASSIGNED_PENDING_SCREEN','family_assignment':None,'disposition':'SCREENING','treatment_execution':'NOT_EXECUTED','holdout_access':'NONE'
         })
