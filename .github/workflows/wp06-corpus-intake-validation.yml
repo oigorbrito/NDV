@@ -104,12 +104,19 @@ jobs:
           python tools/ndv_validate_s2_audit.py experiments/p1/s2-audit-state-01.json
           python - <<'PY'
           import json, sys
-          p=json.load(open('experiments/p1/s2-extraction-environment-v1.json'))
-          assert p['schema_id']=='ndv-p1-s2-extraction-environment-v1'
-          assert (p['python']['required_major'],p['python']['required_minor'])==sys.version_info[:2]
-          assert p['pyarrow']['required_version']=='25.0.1'
-          assert p['network_during_extraction']=='FORBIDDEN'
-          assert p['treatment_execution']=='NOT_EXECUTED' and p['holdout_access']=='NONE'
+          env=json.load(open('experiments/p1/s2-extraction-environment-v1.json'))
+          assert env['schema_id']=='ndv-p1-s2-extraction-environment-v1'
+          assert (env['python']['required_major'],env['python']['required_minor'])==sys.version_info[:2]
+          assert env['pyarrow']['required_version']=='25.0.1'
+          assert env['network_during_extraction']=='FORBIDDEN'
+          assert env['treatment_execution']=='NOT_EXECUTED' and env['holdout_access']=='NONE'
+          audit=json.load(open('experiments/p1/s2-verifier-environment-audit-v2.json'))
+          layout=audit['instance_image_layout']
+          assert layout['revision']=='c71902a8cf8d2b725f63d51f199f4d3e56f68d2d'
+          assert layout['path']=='combine.Dockerfile.j2'
+          assert layout['git_blob_sha']=='b87c412bab0906e054f3c49f653a9b792e4ab7f6'
+          assert layout['project_dir_rule']=='/<repo-name>' and layout['workdir_rule']=='WORKDIR project_dir'
+          assert 'immutable image RepoDigest matching frozen image repository' in audit['base_runner']['required_integrity']
           PY
       - name: Run S2 admission unit tests
         working-directory: tools
