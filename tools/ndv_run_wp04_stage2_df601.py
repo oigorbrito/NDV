@@ -4,8 +4,9 @@
 The runner materializes the exact historical base, proves the structural focal
 fails on base while the historical Rust oracle passes, invokes the same frozen
 Aider+Ollama binding exactly once, captures the candidate, and verifies it.
-Stage 2 accepts only the original binding bytes preserved by
-ndv_import_wp04_binding.py; a loose/reconstructed binding is not sufficient.
+Stage 2 accepts only the original binding and qualification-evidence bytes
+preserved by ndv_import_wp04_binding.py; loose/reconstructed evidence is not
+sufficient.
 """
 from __future__ import annotations
 
@@ -143,27 +144,38 @@ def load_preserved_binding(binding_import: Path, stage1_import: Path) -> tuple[d
     root = binding_import.resolve()
     receipt_path = root / "binding-import-receipt.json"
     binding_path = root / "executor-binding-v2.json"
+    qualification_path = root / "qualification-evidence.json"
     stage1_report = stage1_import.resolve() / "run-report.json"
-    if not receipt_path.is_file() or not binding_path.is_file():
-        raise ValueError("preserved binding requires binding-import-receipt.json and executor-binding-v2.json")
+    if not receipt_path.is_file() or not binding_path.is_file() or not qualification_path.is_file():
+        raise ValueError("preserved binding requires receipt, executor-binding-v2.json, and qualification-evidence.json")
     if not stage1_report.is_file():
         raise ValueError("Stage 1 run-report missing while validating preserved binding")
     receipt, binding = load(receipt_path), load(binding_path)
-    if receipt.get("schema_id") != "ndv-wp04-binding-import-receipt-v1" or receipt.get("status") != "ORIGINAL_BINDING_PRESERVED":
-        raise ValueError("original binding preservation receipt invalid")
-    if receipt.get("binding_reconstructed") is not False or receipt.get("treatment_reexecuted") is not False or receipt.get("holdout_access") != "NONE":
+    if receipt.get("schema_id") != "ndv-wp04-binding-import-receipt-v2" or receipt.get("status") != "ORIGINAL_BINDING_AND_QUALIFICATION_PRESERVED":
+        raise ValueError("original binding/qualification preservation receipt invalid")
+    if receipt.get("binding_reconstructed") is not False or receipt.get("qualification_reconstructed") is not False or receipt.get("treatment_reexecuted") is not False or receipt.get("holdout_access") != "NONE":
         raise ValueError("binding preservation provenance invalid")
-    if receipt.get("preserved_binding_ref") != "executor-binding-v2.json":
-        raise ValueError("binding receipt does not reference canonical preserved binding filename")
-    data = binding_path.read_bytes()
-    if sha256_bytes(data) != receipt.get("binding_file_sha256") or len(data) != receipt.get("binding_file_size_bytes"):
+    if receipt.get("preserved_binding_ref") != "executor-binding-v2.json" or receipt.get("preserved_qualification_ref") != "qualification-evidence.json":
+        raise ValueError("binding receipt does not reference canonical preserved filenames")
+    binding_data = binding_path.read_bytes()
+    qualification_data = qualification_path.read_bytes()
+    if sha256_bytes(binding_data) != receipt.get("binding_file_sha256") or len(binding_data) != receipt.get("binding_file_size_bytes"):
         raise ValueError("preserved binding hash/size mismatch")
+    if sha256_bytes(qualification_data) != receipt.get("qualification_file_sha256") or len(qualification_data) != receipt.get("qualification_file_size_bytes"):
+        raise ValueError("preserved qualification evidence hash/size mismatch")
+    if receipt.get("binding_declared_qualification_sha256") != receipt.get("qualification_file_sha256"):
+        raise ValueError("receipt qualification hash differs from binding-declared qualification hash")
     if receipt.get("stage1_report_sha256") != sha256_file(stage1_report):
         raise ValueError("binding receipt does not bind to the current preserved Stage 1 report")
     if binding.get("schema_id") != "ndv-p1-wp04-executor-binding-v2" or binding.get("status") != "QUALIFIED":
         raise ValueError("preserved binding is not a qualified binding-v2")
     if binding.get("binding_id") != receipt.get("binding_id") or binding.get("exact_executor_identity") != receipt.get("exact_executor_identity"):
         raise ValueError("preserved binding identity differs from import receipt")
+    if binding.get("qualification_evidence_sha256") != receipt.get("qualification_file_sha256"):
+        raise ValueError("preserved binding no longer matches preserved qualification evidence")
+    qualification = load(qualification_path)
+    if not isinstance(qualification, dict) or qualification.get("status") not in {"S0_READY", "QUALIFIED"}:
+        raise ValueError("preserved qualification evidence is not ready/qualified")
     return binding, receipt, binding_path
 
 
@@ -320,6 +332,8 @@ def main() -> int:
         "binding_import_receipt_sha256": sha256_file(args.binding_import.resolve() / "binding-import-receipt.json"),
         "preserved_binding_ref": str(binding_path),
         "preserved_binding_sha256": sha256_file(binding_path),
+        "preserved_qualification_ref": str(args.binding_import.resolve() / "qualification-evidence.json"),
+        "preserved_qualification_sha256": sha256_file(args.binding_import.resolve() / "qualification-evidence.json"),
         "executor_identity": binding.get("exact_executor_identity"),
         "aider_version_revalidated": aider_version,
         "ollama_model_revalidated": ollama_model,
