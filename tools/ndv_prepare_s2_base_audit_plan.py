@@ -136,7 +136,8 @@ def build_plan(receipt_path: Path, wave_path: Path, audit_root: Path, runner: Pa
     if len(candidate_ids) != len(set(candidate_ids)) or set(manifest_by_id) != set(candidate_ids):
         raise ValueError("wave/quarantine candidate set mismatch")
 
-    runner = runner.resolve()
+    runner = require_file(runner, "base-audit runner")
+    runner_sha = sha256_file(runner)
     entries: list[dict[str, Any]] = []
     for candidate in candidates:
         cid = candidate["candidate_id"]
@@ -170,7 +171,7 @@ def build_plan(receipt_path: Path, wave_path: Path, audit_root: Path, runner: Pa
         })
 
     return {
-        "schema_id": "ndv-p1-s2-base-audit-plan-v1",
+        "schema_id": "ndv-p1-s2-base-audit-plan-v2",
         "status": "AUDIT_PLAN_READY",
         "wave_id": wave.get("wave_id"),
         "wave_ref": str(wave_path.resolve()),
@@ -179,6 +180,8 @@ def build_plan(receipt_path: Path, wave_path: Path, audit_root: Path, runner: Pa
         "materialization_receipt_file_sha256": sha256_file(receipt_path.resolve()),
         "quarantine_aggregate_ref": str(aggregate_path),
         "quarantine_aggregate_file_sha256": sha256_file(aggregate_path),
+        "runner_ref": str(runner),
+        "runner_file_sha256": runner_sha,
         "candidate_count": len(entries),
         "entries": entries,
         "docker_execution": False,
