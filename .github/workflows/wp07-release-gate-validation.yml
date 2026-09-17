@@ -6,6 +6,7 @@ on:
       - 'experiments/p1/wp07-development-comparison-protocol-v1.json'
       - 'experiments/p1/wp07-treatment-bindings-v1.json'
       - 'experiments/p1/wp07-executor-role-qualification-v1.json'
+      - 'experiments/p1/wp07-static-family-policy-v1.json'
       - 'tools/ndv_validate_wp07_protocol.py'
       - 'tools/test_ndv_validate_wp07_protocol.py'
       - 'tools/ndv_assess_wp07_binding_readiness.py'
@@ -16,6 +17,8 @@ on:
       - 'tools/test_ndv_qualify_codex_subscription_executor.py'
       - 'tools/ndv_promote_codex_bindings_to_wp07.py'
       - 'tools/test_ndv_promote_codex_bindings_to_wp07.py'
+      - 'tools/ndv_freeze_wp07_b3_family_policy.py'
+      - 'tools/test_ndv_freeze_wp07_b3_family_policy.py'
       - 'tools/ndv_promote_wp04_binding_to_wp07.py'
       - 'tools/test_ndv_promote_wp04_binding_to_wp07.py'
       - 'tools/ndv_wp07_preflight.py'
@@ -30,6 +33,7 @@ on:
       - 'experiments/p1/wp07-development-comparison-protocol-v1.json'
       - 'experiments/p1/wp07-treatment-bindings-v1.json'
       - 'experiments/p1/wp07-executor-role-qualification-v1.json'
+      - 'experiments/p1/wp07-static-family-policy-v1.json'
       - 'tools/ndv_validate_wp07_protocol.py'
       - 'tools/test_ndv_validate_wp07_protocol.py'
       - 'tools/ndv_assess_wp07_binding_readiness.py'
@@ -40,6 +44,8 @@ on:
       - 'tools/test_ndv_qualify_codex_subscription_executor.py'
       - 'tools/ndv_promote_codex_bindings_to_wp07.py'
       - 'tools/test_ndv_promote_codex_bindings_to_wp07.py'
+      - 'tools/ndv_freeze_wp07_b3_family_policy.py'
+      - 'tools/test_ndv_freeze_wp07_b3_family_policy.py'
       - 'tools/ndv_promote_wp04_binding_to_wp07.py'
       - 'tools/test_ndv_promote_wp04_binding_to_wp07.py'
       - 'tools/ndv_wp07_preflight.py'
@@ -69,6 +75,7 @@ jobs:
           python -m py_compile tools/ndv_probe_wp07_subscription_surfaces.py
           python -m py_compile tools/ndv_qualify_codex_subscription_executor.py
           python -m py_compile tools/ndv_promote_codex_bindings_to_wp07.py
+          python -m py_compile tools/ndv_freeze_wp07_b3_family_policy.py
           python -m py_compile tools/ndv_promote_wp04_binding_to_wp07.py
           python -m py_compile tools/ndv_wp07_preflight.py
           python -m py_compile tools/ndv_materialize_wp07_run_matrix.py
@@ -87,6 +94,7 @@ jobs:
           python -m unittest -v test_ndv_probe_wp07_subscription_surfaces.py
           python -m unittest -v test_ndv_qualify_codex_subscription_executor.py
           python -m unittest -v test_ndv_promote_codex_bindings_to_wp07.py
+          python -m unittest -v test_ndv_freeze_wp07_b3_family_policy.py
           python -m unittest -v test_ndv_promote_wp04_binding_to_wp07.py
           python -m unittest -v test_ndv_wp07_preflight.py
           python -m unittest -v test_ndv_materialize_wp07_run_matrix.py
