@@ -1,0 +1,58 @@
+{
+  "schema_id": "ndv-p1-wp07-codex-qualification-amendment-v2",
+  "status": "PROSPECTIVE_AMENDMENT_FROZEN_NOT_EXECUTED",
+  "supersedes_for_new_qualification_runs_only": "v1 synthetic qualifier behavior",
+  "historical_v1_evidence_reinterpretation": "FORBIDDEN",
+  "reason": "A first synthetic qualification attempt exposed two harness/interface facts before any P1 development-task exposure: Windows sandbox denied access to a repo under the process temp directory, and Codex exec JSONL did not emit runtime model identity.",
+  "workspace_policy": {
+    "v1": "system temporary directory",
+    "v2": "persistent synthetic-workspace under the qualification output directory",
+    "motivation": "keep the synthetic git workspace inside an operator-controlled project-adjacent path that Codex workspace-write can access on Windows",
+    "same_task": true,
+    "same_expected_mutation": "TARGET.txt BEFORE\\n -> AFTER\\n",
+    "retry_of_v1": false,
+    "new_qualification_cohort": "V2"
+  },
+  "identity_policy": {
+    "required_cli_version_exact": "0.154.0",
+    "requested_model_must_be_explicit_cli_argument": true,
+    "runtime_model_echo": "NOT_AVAILABLE_IN_CODEX_EXEC_JSONL_0.154.0",
+    "accepted_assurance": "CLI_PINNED_SOURCE_VERIFIED",
+    "accepted_only_when": [
+      "codex version parses exactly as 0.154.0",
+      "invocation contains --model followed by the preregistered model identity",
+      "API-routing environment variables are removed as frozen by the execution-surface contract",
+      "user config and rules are disabled by the frozen execution-surface contract",
+      "upstream source provenance below remains the authority for CLI model semantics and JSONL non-observability"
+    ],
+    "forbidden_inference": "Do not claim runtime model echo or provider-side attestation. Identity is configuration-pinned with version-matched upstream source evidence, not wire-echoed.",
+    "unknown_or_different_cli_version": "S0_IDENTITY_UNRESOLVED"
+  },
+  "upstream_provenance": {
+    "repository": "openai/codex",
+    "release_tag": "rust-v0.154.0",
+    "tag_object_sha": "36eab01061df3cde5f95ec20a526777b430091ba",
+    "release_commit": "6b9826e3aa83b1a5947db50f4332cb9c65f1b340",
+    "model_cli_source": {
+      "path": "codex-rs/utils/cli/src/shared_options.rs",
+      "git_blob_sha": "5e525662d49ce0697ff6965473be178378443776",
+      "relevant_semantics": "--model / -m is documented as 'Model the agent should use' and stored as SharedCliOptions.model"
+    },
+    "jsonl_schema_source": {
+      "path": "codex-rs/exec/src/exec_events.rs",
+      "git_blob_sha": "30df7f176a02c5283405a70fac2d5ef9acdcb66e",
+      "relevant_semantics": "ThreadStartedEvent contains thread_id only and TurnCompletedEvent contains usage only; model identity is not emitted in the exec JSONL event schema"
+    }
+  },
+  "decision_rules": {
+    "timeout": "S0_RESOURCE_LIMIT",
+    "nonzero_executor_returncode": "S0_EXECUTOR_BLOCKED",
+    "identity_assurance_not_satisfied": "S0_IDENTITY_UNRESOLVED",
+    "synthetic_mutation_not_exact": "S0_MUTATION_FAILED",
+    "otherwise": "S0_READY"
+  },
+  "treatment_results_consulted": false,
+  "development_task_exposure": false,
+  "holdout_access": "NONE",
+  "treatment_execution": "NOT_EXECUTED"
+}
