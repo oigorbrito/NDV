@@ -3,85 +3,15 @@ name: WP-06 Corpus Intake Validation
 on:
   push:
     paths:
-      - 'experiments/p1/s2-corpus-intake-v1.json'
-      - 'experiments/p1/s2-source-snapshot-01.json'
-      - 'experiments/p1/s2-parquet-acquisition-v1.json'
-      - 'experiments/p1/s2-extraction-environment-v1.json'
-      - 'experiments/p1/s2-candidate-wave-01.json'
-      - 'experiments/p1/s2-audit-state-01.json'
-      - 'experiments/p1/s2-verifier-environment-audit-v2.json'
-      - 'tools/ndv_acquire_s2_pinned_parquet.py'
-      - 'tools/ndv_materialize_s2_wave.py'
-      - 'tools/ndv_prepare_s2_base_audit_plan.py'
-      - 'tools/ndv_acquire_s2_images.py'
-      - 'tools/ndv_bind_s2_audit_plan_images.py'
-      - 'tools/ndv_execute_s2_base_audit_plan.py'
-      - 'tools/ndv_validate_corpus_intake.py'
-      - 'tools/ndv_extract_pinned_swe_rebench_rows.py'
-      - 'tools/ndv_quarantine_swe_rebench_rows.py'
-      - 'tools/ndv_run_s2_base_audit.py'
-      - 'tools/ndv_interpret_s2_base_oracle.py'
-      - 'tools/ndv_build_s2_verifier_evidence.py'
-      - 'tools/ndv_validate_s2_audit.py'
-      - 'tools/ndv_decide_s2_admission.py'
-      - 'tools/ndv_freeze_s2_admission.py'
-      - 'tools/test_ndv_acquire_s2_pinned_parquet.py'
-      - 'tools/test_ndv_materialize_s2_wave.py'
-      - 'tools/test_ndv_prepare_s2_base_audit_plan.py'
-      - 'tools/test_ndv_acquire_s2_images.py'
-      - 'tools/test_ndv_bind_s2_audit_plan_images.py'
-      - 'tools/test_ndv_execute_s2_base_audit_plan.py'
-      - 'tools/test_ndv_validate_corpus_intake.py'
-      - 'tools/test_ndv_extract_pinned_swe_rebench_rows.py'
-      - 'tools/test_ndv_quarantine_swe_rebench_rows.py'
-      - 'tools/test_ndv_s2_quarantine_indices.py'
-      - 'tools/test_ndv_run_s2_base_audit.py'
-      - 'tools/test_ndv_interpret_s2_base_oracle.py'
-      - 'tools/test_ndv_build_s2_verifier_evidence.py'
-      - 'tools/test_ndv_validate_s2_audit.py'
-      - 'tools/test_ndv_decide_s2_admission.py'
-      - 'tools/test_ndv_freeze_s2_admission.py'
+      - 'experiments/p1/s2-*.json'
+      - 'tools/ndv_*s2*.py'
+      - 'tools/test_ndv_*s2*.py'
       - '.github/workflows/wp06-corpus-intake-validation.yml'
   pull_request:
     paths:
-      - 'experiments/p1/s2-corpus-intake-v1.json'
-      - 'experiments/p1/s2-source-snapshot-01.json'
-      - 'experiments/p1/s2-parquet-acquisition-v1.json'
-      - 'experiments/p1/s2-extraction-environment-v1.json'
-      - 'experiments/p1/s2-candidate-wave-01.json'
-      - 'experiments/p1/s2-audit-state-01.json'
-      - 'experiments/p1/s2-verifier-environment-audit-v2.json'
-      - 'tools/ndv_acquire_s2_pinned_parquet.py'
-      - 'tools/ndv_materialize_s2_wave.py'
-      - 'tools/ndv_prepare_s2_base_audit_plan.py'
-      - 'tools/ndv_acquire_s2_images.py'
-      - 'tools/ndv_bind_s2_audit_plan_images.py'
-      - 'tools/ndv_execute_s2_base_audit_plan.py'
-      - 'tools/ndv_validate_corpus_intake.py'
-      - 'tools/ndv_extract_pinned_swe_rebench_rows.py'
-      - 'tools/ndv_quarantine_swe_rebench_rows.py'
-      - 'tools/ndv_run_s2_base_audit.py'
-      - 'tools/ndv_interpret_s2_base_oracle.py'
-      - 'tools/ndv_build_s2_verifier_evidence.py'
-      - 'tools/ndv_validate_s2_audit.py'
-      - 'tools/ndv_decide_s2_admission.py'
-      - 'tools/ndv_freeze_s2_admission.py'
-      - 'tools/test_ndv_acquire_s2_pinned_parquet.py'
-      - 'tools/test_ndv_materialize_s2_wave.py'
-      - 'tools/test_ndv_prepare_s2_base_audit_plan.py'
-      - 'tools/test_ndv_acquire_s2_images.py'
-      - 'tools/test_ndv_bind_s2_audit_plan_images.py'
-      - 'tools/test_ndv_execute_s2_base_audit_plan.py'
-      - 'tools/test_ndv_validate_corpus_intake.py'
-      - 'tools/test_ndv_extract_pinned_swe_rebench_rows.py'
-      - 'tools/test_ndv_quarantine_swe_rebench_rows.py'
-      - 'tools/test_ndv_s2_quarantine_indices.py'
-      - 'tools/test_ndv_run_s2_base_audit.py'
-      - 'tools/test_ndv_interpret_s2_base_oracle.py'
-      - 'tools/test_ndv_build_s2_verifier_evidence.py'
-      - 'tools/test_ndv_validate_s2_audit.py'
-      - 'tools/test_ndv_decide_s2_admission.py'
-      - 'tools/test_ndv_freeze_s2_admission.py'
+      - 'experiments/p1/s2-*.json'
+      - 'tools/ndv_*s2*.py'
+      - 'tools/test_ndv_*s2*.py'
       - '.github/workflows/wp06-corpus-intake-validation.yml'
   workflow_dispatch:
 
@@ -96,6 +26,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.13'
+
       - name: Compile S2 admission tooling
         run: |
           python -m py_compile tools/ndv_acquire_s2_pinned_parquet.py
@@ -104,6 +35,11 @@ jobs:
           python -m py_compile tools/ndv_acquire_s2_images.py
           python -m py_compile tools/ndv_bind_s2_audit_plan_images.py
           python -m py_compile tools/ndv_execute_s2_base_audit_plan.py
+          python -m py_compile tools/ndv_interpret_s2_base_audit_batch.py
+          python -m py_compile tools/ndv_build_s2_verifier_batch.py
+          python -m py_compile tools/ndv_build_s2_candidate_state.py
+          python -m py_compile tools/ndv_apply_s2_family_assignments.py
+          python -m py_compile tools/ndv_assemble_s2_audit_state.py
           python -m py_compile tools/ndv_validate_corpus_intake.py
           python -m py_compile tools/ndv_extract_pinned_swe_rebench_rows.py
           python -m py_compile tools/ndv_quarantine_swe_rebench_rows.py
@@ -113,6 +49,7 @@ jobs:
           python -m py_compile tools/ndv_validate_s2_audit.py
           python -m py_compile tools/ndv_decide_s2_admission.py
           python -m py_compile tools/ndv_freeze_s2_admission.py
+
       - name: Validate frozen pre-execution state
         run: |
           python tools/ndv_validate_corpus_intake.py experiments/p1/s2-candidate-wave-01.json
@@ -125,6 +62,10 @@ jobs:
           assert env['pyarrow']['required_version']=='25.0.1'
           assert env['network_during_extraction']=='FORBIDDEN'
           assert env['treatment_execution']=='NOT_EXECUTED' and env['holdout_access']=='NONE'
+          taxonomy=json.load(open('experiments/p1/s2-family-taxonomy-v1.json'))
+          assert taxonomy['schema_id']=='ndv-p1-s2-family-taxonomy-v1'
+          assert set(taxonomy['families'])=={'F1','F2','F3','F4','F5','F6'}
+          assert taxonomy['performance_based_assignment'] is False
           audit=json.load(open('experiments/p1/s2-verifier-environment-audit-v2.json'))
           layout=audit['instance_image_layout']
           assert layout['revision']=='c71902a8cf8d2b725f63d51f199f4d3e56f68d2d'
@@ -133,6 +74,7 @@ jobs:
           assert layout['project_dir_rule']=='/<repo-name>' and layout['workdir_rule']=='WORKDIR project_dir'
           assert 'immutable image RepoDigest matching frozen image repository' in audit['base_runner']['required_integrity']
           PY
+
       - name: Run S2 admission unit tests
         working-directory: tools
         run: |
@@ -142,6 +84,11 @@ jobs:
           python -m unittest -v test_ndv_acquire_s2_images.py
           python -m unittest -v test_ndv_bind_s2_audit_plan_images.py
           python -m unittest -v test_ndv_execute_s2_base_audit_plan.py
+          python -m unittest -v test_ndv_interpret_s2_base_audit_batch.py
+          python -m unittest -v test_ndv_build_s2_verifier_batch.py
+          python -m unittest -v test_ndv_build_s2_candidate_state.py
+          python -m unittest -v test_ndv_apply_s2_family_assignments.py
+          python -m unittest -v test_ndv_assemble_s2_audit_state.py
           python -m unittest -v test_ndv_validate_corpus_intake.py
           python -m unittest -v test_ndv_extract_pinned_swe_rebench_rows.py
           python -m unittest -v test_ndv_quarantine_swe_rebench_rows.py
