@@ -65,6 +65,26 @@ def normalize_commands(value: Any) -> list[str]:
     return commands
 
 
+def normalize_image_repository(image_ref: str) -> str:
+    ref = image_ref.strip()
+    if "@" in ref:
+        ref = ref.split("@", 1)[0]
+    slash = ref.rfind("/")
+    colon = ref.rfind(":")
+    if colon > slash:
+        ref = ref[:colon]
+    if ref.startswith("docker.io/"):
+        ref = ref[len("docker.io/"):]
+    return ref
+
+
+def repo_digest_matches_image_ref(repo_digest: str, image_ref: str) -> bool:
+    if "@sha256:" not in repo_digest:
+        return False
+    digest_repo = repo_digest.split("@", 1)[0]
+    return normalize_image_repository(digest_repo) == normalize_image_repository(image_ref)
+
+
 def resolve_image_digest(image_ref: str) -> str:
     proc = run(["docker", "image", "inspect", image_ref, "--format", "{{json .RepoDigests}}"], timeout=30)
     if proc.returncode != 0:
@@ -75,9 +95,14 @@ def resolve_image_digest(image_ref: str) -> str:
         raise RuntimeError(f"invalid docker RepoDigests JSON: {exc}") from exc
     if not isinstance(digests, list):
         raise RuntimeError("docker RepoDigests must be a list")
-    candidates = sorted(x for x in digests if isinstance(x, str) and "@sha256:" in x)
+    candidates = sorted(
+        x for x in digests
+        if isinstance(x, str) and repo_digest_matches_image_ref(x, image_ref)
+    )
     if not candidates:
-        raise RuntimeError("image has no immutable RepoDigest")
+        raise RuntimeError(f"image has no immutable RepoDigest matching frozen repository {normalize_image_repository(image_ref)!r}")
+    if len(candidates) != 1:
+        raise RuntimeError(f"image has multiple RepoDigests matching frozen repository: {candidates!r}")
     return candidates[0]
 
 
