@@ -76,7 +76,13 @@ A materialized wave with altered admission bytes, altered executor projection, s
 
 `tools/ndv_run_s2_base_audit.py` consumes the quarantined artifact, re-hashes `full_row`, and rebinds candidate, instance, original row index, and raw-row hash. It requires an immutable Docker RepoDigest, `--network none`, and commands derived only from frozen `install_config.test_cmd`.
 
+The container workdir derivation is no longer implicit. `experiments/p1/s2-verifier-environment-audit-v2.json` freezes the upstream provenance to `SWE-rebench/SWE-rebench-V2@c71902a8…:combine.Dockerfile.j2`, blob `b87c412b…`; that template defines `project_dir = "/<repo-name>"`, clones the repository there, and sets `WORKDIR project_dir`. The NDV runner derives exactly the same `/<repo-name>` path. Changes require a new audited contract revision.
+
+RepoDigest resolution is also repository-bound. The runner no longer selects the first digest from Docker's `RepoDigests`: it normalizes the frozen `image_ref`, keeps only digests for that exact repository, rejects zero matches, and rejects multiple matching immutable digests as ambiguous.
+
 Before tests, the container proves exact `HEAD == base_revision` and a clean worktree. Every test command emits its own return-code marker, so a later success cannot mask an earlier failure. Missing HEAD/cleanliness/command markers yields `harness_integrity=FAIL`. Gold `patch` and `test_patch` are never applied.
+
+The upstream evaluator at the same frozen revision uses the same workdir and `install_config.test_cmd`, but applies both solution `patch` and `test_patch` before tests. NDV intentionally omits both in base mode to observe pre-solution behavior. Upstream evaluation uses host networking; NDV intentionally uses `--network none` for the admission-side base audit, so unavoidable network dependencies become environment-inconclusive rather than silently contaminating reproducibility.
 
 ## Oracle interpretation and verifier evidence
 
@@ -100,9 +106,9 @@ python tools/ndv_validate_corpus_intake.py experiments/p1/s2-candidate-wave-01.j
 
 The validator requires unique non-negative `source_row_index` and unique `source_instance_id` values.
 
-CI is `.github/workflows/wp06-corpus-intake-validation.yml`. It compiles and tests acquisition, frozen extraction environment, byte-bound materialization, original-index preservation, quarantine, byte-bound base-audit planning, base audit, oracle interpretation, verifier construction, audit validation, deterministic decision, and admission freeze. It performs no model calls, Parquet download, Docker candidate run, or treatment execution.
+CI is `.github/workflows/wp06-corpus-intake-validation.yml`. It compiles and tests acquisition, frozen extraction environment, byte-bound materialization, original-index preservation, quarantine, byte-bound base-audit planning, upstream image-layout provenance, repository-bound RepoDigest resolution, base audit, oracle interpretation, verifier construction, audit validation, deterministic decision, and admission freeze. It performs no model calls, Parquet download, Docker candidate run, or treatment execution.
 
-Latest validated tooling state: GitHub Actions run `35175245695` completed successfully.
+Latest validated tooling/contract state: GitHub Actions run `35175549450` completed successfully.
 
 ## Current gate
 
