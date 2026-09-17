@@ -93,7 +93,8 @@ class CodexPromptCompilerTests(unittest.TestCase):
             self.assertIn("Objective:\nFix the parser edge case.\n", out["prompt"])
             self.assertIn("repository: org/repo", out["prompt"])
             self.assertIn("base revision: " + "b"*40, out["prompt"])
-            self.assertNotIn("patch", out["prompt"].lower())
+            self.assertNotIn("secret", out["prompt"].lower())
+            self.assertFalse(out["forbidden_source_accessed"])
 
     def test_executor_visible_byte_tamper_blocks(self):
         with tempfile.TemporaryDirectory() as tmp:
