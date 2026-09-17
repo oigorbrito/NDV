@@ -51,6 +51,34 @@ class Stage2GateTests(unittest.TestCase):
             (root / "import-manifest.json").write_text(json.dumps({"schema_id": "ndv-wp04-import-manifest-v1"}), encoding="utf-8")
         return root
 
+    def make_binding_import(self, stage1: Path, *, binding_id="B1", reconstructed=False) -> Path:
+        root = stage1.parent / (stage1.name + "-binding")
+        root.mkdir()
+        binding = {
+            "schema_id": "ndv-p1-wp04-executor-binding-v2",
+            "status": "QUALIFIED",
+            "binding_id": binding_id,
+            "exact_executor_identity": "aider(aider 0.86.2)+qwen2.5-coder:3b",
+        }
+        binding_bytes = (json.dumps(binding, sort_keys=True) + "\n").encode()
+        (root / "executor-binding-v2.json").write_bytes(binding_bytes)
+        report_path = stage1 / "run-report.json"
+        receipt = {
+            "schema_id": "ndv-wp04-binding-import-receipt-v1",
+            "status": "ORIGINAL_BINDING_PRESERVED",
+            "binding_id": binding_id,
+            "exact_executor_identity": binding["exact_executor_identity"],
+            "preserved_binding_ref": "executor-binding-v2.json",
+            "binding_file_sha256": sha(binding_bytes),
+            "binding_file_size_bytes": len(binding_bytes),
+            "stage1_report_sha256": mod.sha256_file(report_path),
+            "treatment_reexecuted": False,
+            "binding_reconstructed": reconstructed,
+            "holdout_access": "NONE",
+        }
+        (root / "binding-import-receipt.json").write_text(json.dumps(receipt), encoding="utf-8")
+        return root
+
     def test_valid_import_passes(self):
         root = self.make_import()
         manifest = mod.validate_stage1_import(root, "B1")
@@ -85,6 +113,36 @@ class Stage2GateTests(unittest.TestCase):
         path.write_text(json.dumps(manifest))
         with self.assertRaisesRegex(ValueError, "canonical v2 list form"):
             mod.validate_stage1_import(root, "B1")
+
+    def test_preserved_original_binding_passes(self):
+        stage1 = self.make_import()
+        binding_dir = self.make_binding_import(stage1)
+        binding, receipt, binding_path = mod.load_preserved_binding(binding_dir, stage1)
+        self.assertEqual(binding["binding_id"], "B1")
+        self.assertEqual(receipt["status"], "ORIGINAL_BINDING_PRESERVED")
+        self.assertEqual(binding_path.name, "executor-binding-v2.json")
+
+    def test_tampered_preserved_binding_is_rejected(self):
+        stage1 = self.make_import()
+        binding_dir = self.make_binding_import(stage1)
+        (binding_dir / "executor-binding-v2.json").write_text("{}", encoding="utf-8")
+        with self.assertRaisesRegex(ValueError, "hash/size mismatch"):
+            mod.load_preserved_binding(binding_dir, stage1)
+
+    def test_reconstructed_binding_receipt_is_rejected(self):
+        stage1 = self.make_import()
+        binding_dir = self.make_binding_import(stage1, reconstructed=True)
+        with self.assertRaisesRegex(ValueError, "provenance invalid"):
+            mod.load_preserved_binding(binding_dir, stage1)
+
+    def test_binding_receipt_must_match_current_stage1_report(self):
+        stage1 = self.make_import()
+        binding_dir = self.make_binding_import(stage1)
+        report = json.loads((stage1 / "run-report.json").read_text())
+        report["extra"] = "tampered"
+        (stage1 / "run-report.json").write_text(json.dumps(report), encoding="utf-8")
+        with self.assertRaisesRegex(ValueError, "current preserved Stage 1 report"):
+            mod.load_preserved_binding(binding_dir, stage1)
 
     def test_explicit_aider_must_match_frozen_binding_path(self):
         with tempfile.TemporaryDirectory() as tmp:
