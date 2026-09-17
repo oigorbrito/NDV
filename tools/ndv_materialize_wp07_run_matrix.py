@@ -12,6 +12,8 @@ import json
 from pathlib import Path
 from typing import Any
 
+from ndv_wp07_codex_bundle import verify_bundle
+
 TREATMENTS = {"B0","B1","B2","B3","B4"}
 SHAPING_MODES = {"S0_ONLY", "PAIRED_S0_S1"}
 
@@ -64,11 +66,21 @@ def verify_registry(path: Path, root: Path) -> dict[str,Any]:
         bindings=t.get("bindings")
         if not isinstance(bindings,dict) or not bindings: raise ValueError(f"{tid}: concrete bindings required")
         for alias,b in bindings.items():
+            resolved={}
             for ref_key,hash_key in (("binding_ref","binding_file_sha256"),("qualification_ref","qualification_file_sha256")):
                 ref=b.get(ref_key)
                 if not isinstance(ref,str): raise ValueError(f"{tid}.{alias}: {ref_key} missing")
                 p=Path(ref); p=p if p.is_absolute() else root/p; p=require(p,f"{tid}.{alias} {ref_key}")
                 if sha_file(p)!=b.get(hash_key): raise ValueError(f"{tid}.{alias}: {ref_key} hash mismatch")
+                resolved[ref_key]=p
+            if b.get("surface_class")=="SUBSCRIPTION_EXECUTOR_PINNED":
+                ref=b.get("evidence_manifest_ref")
+                if not isinstance(ref,str): raise ValueError(f"{tid}.{alias}: evidence_manifest_ref missing")
+                mp=Path(ref); mp=mp if mp.is_absolute() else root/mp; mp=require(mp,f"{tid}.{alias} evidence_manifest_ref")
+                if sha_file(mp)!=b.get("evidence_manifest_sha256"): raise ValueError(f"{tid}.{alias}: evidence manifest hash mismatch")
+                verify_bundle(mp.parent)
+                if (mp.parent/"executor-binding.json").resolve()!=resolved["binding_ref"] or (mp.parent/"qualification.json").resolve()!=resolved["qualification_ref"]:
+                    raise ValueError(f"{tid}.{alias}: evidence manifest does not bind registry refs")
     return reg
 
 def treatment_binding_snapshot(tid: str, family: str, reg: dict[str,Any]) -> dict[str,Any]:
@@ -78,7 +90,8 @@ def treatment_binding_snapshot(tid: str, family: str, reg: dict[str,Any]) -> dic
         if alias not in bindings: raise ValueError(f"B3: no frozen binding for family {family}")
         selected={"FAMILY_SELECTED":bindings[alias]}
     else: selected=bindings
-    return {role:{k:b.get(k) for k in ("binding_id","binding_ref","binding_file_sha256","qualification_ref","qualification_file_sha256","exact_executor_identity","surface_class")} for role,b in selected.items()}
+    keys=("binding_id","binding_ref","binding_file_sha256","qualification_ref","qualification_file_sha256","evidence_manifest_ref","evidence_manifest_sha256","exact_executor_identity","surface_class")
+    return {role:{k:b.get(k) for k in keys if k in b} for role,b in selected.items()}
 def run_id(task_id: str, tid: str, shaping: str) -> str:
     seed=f"P1-S2|{task_id}|{tid}|{shaping}|rollout=1|repetition=1".encode()
     return "P1S2-"+hashlib.sha256(seed).hexdigest()[:20]
