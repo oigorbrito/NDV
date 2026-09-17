@@ -14,6 +14,8 @@ REQUIRED_ARTIFACTS = (
     "evidence/candidate.diff",
     "evidence/git-status.txt",
 )
+QUALIFICATION_SCHEMAS={"ndv-p1-wp07-codex-subscription-qualification-v1","ndv-p1-wp07-codex-subscription-qualification-v2"}
+BINDING_SCHEMAS={"ndv-p1-wp07-executor-binding-v1","ndv-p1-wp07-executor-binding-v2"}
 
 
 def sha_file(path: Path) -> str:
@@ -38,9 +40,9 @@ def seal_bundle(root: Path) -> dict[str, Any]:
         raise ValueError(f"refusing overwrite: {manifest_path}")
     q = json.loads((root / "qualification.json").read_text(encoding="utf-8"))
     b = json.loads((root / "executor-binding.json").read_text(encoding="utf-8"))
-    if q.get("schema_id") != "ndv-p1-wp07-codex-subscription-qualification-v1" or q.get("status") != "S0_READY":
+    if q.get("schema_id") not in QUALIFICATION_SCHEMAS or q.get("status") != "S0_READY":
         raise ValueError("only S0_READY Codex qualifications can be sealed")
-    if b.get("schema_id") != "ndv-p1-wp07-executor-binding-v1" or b.get("status") != "QUALIFIED":
+    if b.get("schema_id") not in BINDING_SCHEMAS or b.get("status") != "QUALIFIED":
         raise ValueError("qualified Codex binding required")
     if b.get("qualification_file_sha256") != sha_file(root / "qualification.json"):
         raise ValueError("binding is not hash-bound to qualification.json")
@@ -50,6 +52,8 @@ def seal_bundle(root: Path) -> dict[str, Any]:
     manifest = {
         "schema_id": "ndv-p1-wp07-codex-evidence-manifest-v1",
         "status": "SEALED_SYNTHETIC_QUALIFICATION_EVIDENCE",
+        "qualification_schema":q.get("schema_id"),
+        "binding_schema":b.get("schema_id"),
         "candidate_id": q.get("candidate_id"),
         "requested_model": q.get("requested_model"),
         "binding_id": b.get("binding_id"),
@@ -89,6 +93,8 @@ def verify_bundle(root: Path, *, expected_model: str | None = None, expected_can
             raise ValueError(f"{root}: artifact hash/size mismatch: {rel}")
     q = json.loads((root / "qualification.json").read_text(encoding="utf-8"))
     b = json.loads((root / "executor-binding.json").read_text(encoding="utf-8"))
+    if q.get("schema_id") not in QUALIFICATION_SCHEMAS or b.get("schema_id") not in BINDING_SCHEMAS:
+        raise ValueError(f"{root}: unsupported qualification/binding schema")
     if q.get("status") != "S0_READY" or b.get("status") != "QUALIFIED":
         raise ValueError(f"{root}: qualification/binding no longer ready")
     if b.get("qualification_file_sha256") != sha_file(root / "qualification.json"):
