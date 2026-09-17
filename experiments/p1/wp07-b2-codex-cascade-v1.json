@@ -1,0 +1,64 @@
+{
+  "schema_id": "ndv-p1-wp07-b2-codex-cascade-v1",
+  "status": "PROSPECTIVE_FROZEN_NOT_EXECUTED",
+  "treatment_id": "B2",
+  "name": "CHEAP_THEN_ESCALATE",
+  "hops": [
+    {"index": 1, "role": "PRIMARY_ECONOMIC", "expected_candidate_id": "CODEX-PLUS-GPT-5.6-LUNA", "model": "gpt-5.6-luna"},
+    {"index": 2, "role": "ESCALATION_STRONG", "expected_candidate_id": "CODEX-PLUS-GPT-5.6-SOL", "model": "gpt-5.6-sol"}
+  ],
+  "escalation_triggers": [
+    "MISSING_CANDIDATE_BEFORE_TIMEOUT",
+    "EXPLICIT_EXECUTOR_BLOCKER",
+    "FOCAL_OR_PRESERVATION_FAILURE",
+    "STRUCTURALLY_INVALID_ARTIFACT",
+    "DETERMINISTIC_RESOURCE_CEILING"
+  ],
+  "forbidden_triggers": ["SUBJECTIVE_DIFFICULTY", "MANUAL_INTUITION", "HIDDEN_REASONING_CLASSIFICATION", "POST_HOC_MODEL_SELECTION"],
+  "handoff": {
+    "mode": "BASE_RESET_COMPACT_STATE",
+    "second_hop_workspace": "FRESH_EXACT_AUDITED_BASE",
+    "first_hop_workspace_reuse": false,
+    "first_hop_patch_preapplied_to_second_hop": false,
+    "allowed_fields": [
+      "task_identity",
+      "frozen_task_prompt",
+      "escalation_trigger",
+      "first_hop_binding_id",
+      "first_hop_model",
+      "first_hop_exit_code",
+      "first_hop_stage_status",
+      "candidate_diff_sha256",
+      "candidate_diff_bytes",
+      "candidate_diff_text_when_nonempty",
+      "failed_verifier_outcome_when_available",
+      "failed_focal_or_preservation_observations_when_available",
+      "remaining_run_budget_ms"
+    ],
+    "forbidden_fields": ["full_executor_transcript", "hidden_reasoning", "chain_of_thought", "gold_patch", "test_patch", "admission_only_full_row", "holdout_data"],
+    "deterministic_prompt_rule": "Append a fixed escalation section to the same frozen S0/S1 task prompt. Include the first-hop candidate diff text if nonempty and a compact machine-derived failure certificate. No LLM summarization or manual editing."
+  },
+  "verification_policy": {
+    "first_hop_candidate_nonempty": "VERIFY_BEFORE_ESCALATION_DECISION",
+    "first_hop_candidate_empty": "ESCALATE_DIRECTLY_WITH_MISSING_CANDIDATE_TRIGGER",
+    "first_hop_verified_yes": "STOP_WITHOUT_ESCALATION",
+    "second_hop": "ALWAYS_VERIFY_IF_EXECUTOR_STAGE_IS_VERIFIABLE",
+    "harness_or_oracle_inconclusive_without_preregistered_trigger": "STOP_INCONCLUSIVE"
+  },
+  "accounting": {
+    "both_hops_count_when_executed": true,
+    "first_hop_verification_counts_when_executed": true,
+    "second_hop_verification_counts_when_executed": true,
+    "handoff_input_tokens_are_captured_in_second_hop_usage": true,
+    "missing_mandatory_usage_is_not_zero": true,
+    "analytical_run_remains_inconclusive_when_mandatory_consumed-hop_usage_is_missing": true
+  },
+  "retry_limit_per_hop": 0,
+  "escalation_limit": 1,
+  "dynamic_routing": false,
+  "manual_override": false,
+  "treatment_results_consulted": false,
+  "task_exposure": false,
+  "treatment_execution": "NOT_EXECUTED",
+  "holdout_access": "NONE"
+}
