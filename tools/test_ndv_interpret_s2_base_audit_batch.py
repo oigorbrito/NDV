@@ -22,7 +22,7 @@ class OracleBatchTests(unittest.TestCase):
             receipt,plan,_,_=self.fixture(Path(tmp)); r,p=mod.validate_inputs(receipt,plan); self.assertEqual(r['status'],'BASE_AUDIT_BATCH_RECORDED'); self.assertEqual(p['status'],'AUDIT_EXECUTION_PLAN_READY')
     def test_plan_hash_mismatch_rejected(self):
         with tempfile.TemporaryDirectory() as tmp:
-            root=Path(tmp); receipt,plan,_,_=self.fixture(root); plan.write_text('{"changed":true}')
+            root=Path(tmp); receipt,plan,_,_=self.fixture(root); payload=json.loads(plan.read_text()); payload['note']='changed bytes with valid schema'; plan.write_text(json.dumps(payload))
             with self.assertRaisesRegex(ValueError,'plan hash mismatch'): mod.validate_inputs(receipt,plan)
     @mock.patch.object(mod.subprocess,'run')
     def test_main_records_oracle_output_even_returncode_two(self, run_mock):
