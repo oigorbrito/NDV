@@ -40,6 +40,7 @@ jobs:
           python -m py_compile tools/ndv_build_s2_candidate_state.py
           python -m py_compile tools/ndv_apply_s2_family_assignments.py
           python -m py_compile tools/ndv_assemble_s2_audit_state.py
+          python -m py_compile tools/ndv_assess_s2_corpus_readiness.py
           python -m py_compile tools/ndv_validate_corpus_intake.py
           python -m py_compile tools/ndv_extract_pinned_swe_rebench_rows.py
           python -m py_compile tools/ndv_quarantine_swe_rebench_rows.py
@@ -89,6 +90,7 @@ jobs:
           python -m unittest -v test_ndv_build_s2_candidate_state.py
           python -m unittest -v test_ndv_apply_s2_family_assignments.py
           python -m unittest -v test_ndv_assemble_s2_audit_state.py
+          python -m unittest -v test_ndv_assess_s2_corpus_readiness.py
           python -m unittest -v test_ndv_validate_corpus_intake.py
           python -m unittest -v test_ndv_extract_pinned_swe_rebench_rows.py
           python -m unittest -v test_ndv_quarantine_swe_rebench_rows.py
