@@ -76,30 +76,36 @@ The preserved Stage-1 report records the local original binding path `.ndv-probe
 5. records binding SHA-256/size and Stage-1 report SHA-256 in `binding-import-receipt.json`;
 6. explicitly records `binding_reconstructed=false` and `treatment_reexecuted=false`.
 
-GitHub issue #2 tracks this provenance blocker. The importer/tests are CI-green in WP-04 run `35148684510`; the remaining blocker is availability of the original local binding file.
+GitHub issue #2 tracks this provenance blocker. The importer/tests are CI-green; the remaining blocker is availability of the original local binding file.
 
 ### Stage 2 — D-F6-01
 
-Stage 2 has **not** been executed. Its task contract and runner are frozen. Before any D-F6-01 exposure, `tools/ndv_run_wp04_stage2_df601.py` now requires:
+Stage 2 has **not** been executed. Its task contract and runner are frozen. The runner no longer accepts a loose/local `--binding` argument. It requires `--binding-import`, pointing to the immutable directory produced by `ndv_import_wp04_binding.py`, and derives `executor-binding-v2.json` from that preserved evidence.
+
+Before any D-F6-01 exposure, `tools/ndv_run_wp04_stage2_df601.py` requires:
 
 1. a hash-valid Stage-1 import manifest v2;
-2. the same original binding used in Stage 1;
-3. the exact Aider executable path frozen in that binding;
-4. `aider --version` to exactly match the frozen Aider version;
-5. Ollama endpoint, installed model identity and model digest to exactly match the frozen binding;
-6. discriminating structural focal failure on the untouched historical base;
-7. all frozen Rust baseline oracle checks to pass;
-8. zero retry/escalation and sealed holdout.
+2. `binding-import-receipt.json` with `status=ORIGINAL_BINDING_PRESERVED`;
+3. `binding_reconstructed=false`, `treatment_reexecuted=false`, holdout `NONE`;
+4. exact preserved binding SHA-256/size match;
+5. binding receipt bound to the current preserved Stage-1 `run-report.json` SHA-256;
+6. the same binding ID used in Stage 1;
+7. the exact Aider executable path frozen in that binding;
+8. `aider --version` to exactly match the frozen Aider version;
+9. Ollama endpoint, installed model identity and model digest to exactly match the frozen binding;
+10. discriminating structural focal failure on the untouched historical base;
+11. all frozen Rust baseline oracle checks to pass;
+12. zero retry/escalation and sealed holdout.
 
-The Ollama identity gate reads only the local `/api/tags` inventory and aborts before task materialization/exposure if the endpoint, model name or digest has drifted. It does not download, retag, update or repair the model.
+The Ollama identity gate reads only the local `/api/tags` inventory and aborts before task materialization/exposure if endpoint, model name or digest has drifted. It does not download, retag, update or repair the model.
 
-The Stage-1 artifact inventory shape is aligned with the canonical v2 importer format: a list of `{path, size_bytes, sha256}` records. This fixes the prior inconsistency where the Stage-2 runner expected a dict/`bytes` shape that the official importer never emitted.
+The preserved-binding gate is intentionally stronger than a binding-ID check: a freshly reconstructed JSON file with the same ID is not authorized for Stage 2.
 
 ## Import and campaign closure
 
 `tools/ndv_import_wp04_stage_run.py` imports only immutable evidence, never `workspace/` or verifier environments, and emits manifest v2 with token reconciliation.
 
-`tools/ndv_close_wp04_campaign.py` closes WP-04 only after **both** D-F5-01 and D-F6-01 have hash-valid v2 evidence bundles from the same binding. It re-hashes the preserved artifacts and rejects retry/escalation, holdout access, missing raw evidence provenance, treatment reexecution, or binding mismatch.
+`tools/ndv_close_wp04_campaign.py` closes WP-04 only after **both** D-F5-01 and D-F6-01 have hash-valid v2 evidence bundles from the same binding. It re-hashes preserved artifacts and rejects retry/escalation, holdout access, missing raw evidence provenance, treatment reexecution, or binding mismatch.
 
 Even a successful closure grants only `WP04_PIPELINE_SMOKE_COMPLETE`; comparative P1 release remains `NO`.
 
@@ -120,7 +126,8 @@ WP-03 = PASS
 WP-04_CONTRACT = FROZEN
 WP-04_EXECUTOR_BINDING_V2 = FROZEN / QUALIFIED AT STAGE1 EXECUTION
 WP-04_ORIGINAL_BINDING_BYTES_IN_REPO = NO
-WP-04_BINDING_IMPORT_TOOLING = PASS (CI 35148684510)
+WP-04_BINDING_IMPORT_TOOLING = PASS
+WP-04_STAGE2_PRESERVED_BINDING_GATE = PASS (CI 35175339121)
 WP-04_STAGE1_D-F5-01 = EXECUTED
 WP-04_STAGE1_OUTCOME = SMOKE_VALID_FAILED
 WP-04_STAGE1_RAW_EVIDENCE = PRESERVED
@@ -132,4 +139,4 @@ COMPARATIVE_AUTHORITY = NONE
 ARCHITECTURE_AUTHORITY = NONE
 ```
 
-The next execution gate is: import the **original** binding-v2 bytes, create/revalidate the Stage-1 v2 sidecar, and only then run D-F6-01 once with that exact binding. No Stage-2 exposure is authorized if the binding/sidecar/hash/scaffold/model gates fail.
+The next execution gate is: import the **original** binding-v2 bytes, create/revalidate the Stage-1 v2 sidecar, and only then run D-F6-01 once using `--binding-import` against the preserved binding directory. No Stage-2 exposure is authorized if the binding/receipt/sidecar/hash/scaffold/model gates fail.
