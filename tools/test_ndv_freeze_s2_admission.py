@@ -1,6 +1,6 @@
 import unittest
 
-from ndv_freeze_s2_admission import freeze
+from ndv_freeze_s2_admission import freeze, validate_global_inputs
 
 
 class AdmissionFreezeTests(unittest.TestCase):
@@ -8,6 +8,7 @@ class AdmissionFreezeTests(unittest.TestCase):
         candidate = {
             "candidate_id": "c1", "source_instance_id": "i1", "source_row_index": 7, "repository": "org/repo",
             "base_revision": "a" * 40, "language": "python", "proposed_family": "F1",
+            "family_assignment": {"family": "F1", "rationale": "Localized defect.", "performance_based": False},
             "task_statement_sha256": "b" * 64, "ndv_canonical_row_sha256": "c" * 64,
             "admission_only_ref": "admission.json", "executor_visible_ref": "executor.json", "executor_visible_sha256": "d" * 64,
             "quarantine_manifest_ref": "q.json", "quarantine_status": "PASS", "solution_isolation": "PROVEN",
@@ -51,23 +52,21 @@ class AdmissionFreezeTests(unittest.TestCase):
         self.assertEqual(record["source_row_index"], 7)
         self.assertEqual(record["source_binding"]["ndv_canonical_row_sha256"], "c" * 64)
         self.assertEqual(record["audit"]["environment_sha256"], "5" * 64)
+        self.assertEqual(record["family_assignment"]["family"], "F1")
         self.assertEqual(record["artifact_integrity"]["status"], "VERIFIED")
         self.assertEqual(len(record["record_sha256"]), 64)
 
     def test_declared_metadata_without_verified_bytes_cannot_freeze(self):
         candidate, audit, decision, _ = self.complete()
-        with self.assertRaisesRegex(ValueError, "verified artifact integrity"):
-            freeze(candidate, audit, decision)
+        with self.assertRaisesRegex(ValueError, "verified artifact integrity"): freeze(candidate, audit, decision)
 
     def test_stale_decision_ref_is_rejected(self):
         candidate, audit, decision, integrity = self.complete(); decision["evidence_refs"]["base_run_ref"] = "old-base.json"
-        with self.assertRaisesRegex(ValueError, "stale decision evidence ref"):
-            freeze(candidate, audit, decision, integrity)
+        with self.assertRaisesRegex(ValueError, "stale decision evidence ref"): freeze(candidate, audit, decision, integrity)
 
     def test_stale_decision_hash_is_rejected(self):
         candidate, audit, decision, integrity = self.complete(); decision["evidence_hashes"]["environment_sha256"] = "9" * 64
-        with self.assertRaisesRegex(ValueError, "stale decision evidence hash"):
-            freeze(candidate, audit, decision, integrity)
+        with self.assertRaisesRegex(ValueError, "stale decision evidence hash"): freeze(candidate, audit, decision, integrity)
 
     def test_blocked_decision_cannot_freeze(self):
         candidate, audit, decision, integrity = self.complete(); decision["decision"] = "DO_NOT_ADMIT"; decision["blockers"] = ["X"]
@@ -75,22 +74,29 @@ class AdmissionFreezeTests(unittest.TestCase):
 
     def test_harness_failure_cannot_freeze(self):
         candidate, audit, decision, integrity = self.complete(); audit["harness_integrity"] = "FAIL"
-        with self.assertRaisesRegex(ValueError, "stale decision evidence|harness-valid"):
-            freeze(candidate, audit, decision, integrity)
+        with self.assertRaisesRegex(ValueError, "harness-valid"): freeze(candidate, audit, decision, integrity)
 
     def test_treatment_contamination_cannot_freeze(self):
         candidate, audit, decision, integrity = self.complete(); audit["treatment_execution"] = "EXECUTED"
-        with self.assertRaisesRegex(ValueError, "audit contamination"):
-            freeze(candidate, audit, decision, integrity)
+        with self.assertRaisesRegex(ValueError, "audit contamination"): freeze(candidate, audit, decision, integrity)
 
     def test_missing_environment_hash_is_rejected(self):
         candidate, audit, decision, integrity = self.complete(); audit["environment_sha256"] = None; decision["evidence_hashes"]["environment_sha256"] = None
-        with self.assertRaisesRegex(ValueError, "environment_sha256"):
-            freeze(candidate, audit, decision, integrity)
+        with self.assertRaisesRegex(ValueError, "environment_sha256"): freeze(candidate, audit, decision, integrity)
 
-    def test_discovery_identity_mismatch_rejected(self):
+    def test_identity_mismatch_rejected(self):
         candidate, audit, decision, integrity = self.complete(); audit["candidate_id"] = "other"
         with self.assertRaisesRegex(ValueError, "identity mismatch"): freeze(candidate, audit, decision, integrity)
+
+    def test_family_assignment_must_be_pre_treatment(self):
+        candidate, audit, decision, integrity = self.complete(); candidate["family_assignment"]["performance_based"] = True
+        with self.assertRaisesRegex(ValueError, "pre-treatment family assignment"): freeze(candidate, audit, decision, integrity)
+
+    def test_global_inputs_reject_discovery_wave(self):
+        wave = {"schema_id": "ndv-p1-s2-candidate-wave-v1", "wave_id": "w", "wave_summary": {"treatment_execution": "NOT_EXECUTED", "holdout_access": "NONE"}}
+        audit = {"schema_id": "ndv-p1-s2-audit-state-v1", "holdout_access": "NONE"}
+        decisions = {"schema_id": "ndv-p1-s2-admission-decisions-v2", "wave_id": "w", "treatment_execution": "NOT_EXECUTED", "holdout_access": "NONE"}
+        with self.assertRaisesRegex(ValueError, "candidate evidence state v2"): validate_global_inputs(wave, audit, decisions)
 
 
 if __name__ == "__main__": unittest.main()
