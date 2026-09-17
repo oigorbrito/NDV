@@ -63,43 +63,55 @@ Because the already-preserved Stage-1 bundle predates v2, `tools/ndv_upgrade_wp0
 
 Stage 2 and closure prefer this v2 sidecar when present.
 
-### Original binding preservation
+### Original binding and qualification preservation
 
-The preserved Stage-1 report records the local original binding path `.ndv-probes\bindings\wp04-aider-qwen25-coder-3b-v2.json`, but the exact binding bytes are not yet present in the repository. The binding must **not** be reconstructed after the fact from the report.
+The preserved Stage-1 report records the local original binding path `.ndv-probes\bindings\wp04-aider-qwen25-coder-3b-v2.json`, but neither the exact binding bytes nor the exact qualification-evidence bytes are yet present in the repository. Neither artifact may be reconstructed after the fact from the report.
 
-`tools/ndv_import_wp04_binding.py` is the preservation gate. Given the original local binding-v2 file, it:
+`tools/ndv_import_wp04_binding.py` is the preservation gate. Given the original local binding-v2 file **and** the exact qualification evidence referenced by that binding, it:
 
 1. validates the full current binding-v2 contract;
 2. requires exact Stage-1 `binding_id` and executor-identity match;
 3. rejects retry/escalation, fallback, dynamic routing, or download drift;
-4. copies the exact original bytes into a stable evidence directory;
-5. records binding SHA-256/size and Stage-1 report SHA-256 in `binding-import-receipt.json`;
-6. explicitly records `binding_reconstructed=false` and `treatment_reexecuted=false`.
+4. re-hashes qualification evidence and requires exact equality with `qualification_evidence_sha256` from the binding;
+5. requires qualification status `S0_READY` or `QUALIFIED`;
+6. copies the exact binding bytes as `executor-binding-v2.json` and exact qualification bytes as `qualification-evidence.json`;
+7. emits `ndv-wp04-binding-import-receipt-v2` with SHA-256 and size for both artifacts plus Stage-1 report SHA-256;
+8. explicitly records `binding_reconstructed=false`, `qualification_reconstructed=false`, `treatment_reexecuted=false`, and holdout `NONE`.
 
-GitHub issue #2 tracks this provenance blocker. The importer/tests are CI-green; the remaining blocker is availability of the original local binding file.
+The operator invocation therefore requires both artifacts, for example:
+
+```powershell
+python tools\ndv_import_wp04_binding.py `
+  --binding .ndv-probes\bindings\wp04-aider-qwen25-coder-3b-v2.json `
+  --qualification-evidence .ndv-probes\qualification\aider-qwen25-coder-3b.json
+```
+
+GitHub issue #2 tracks this provenance blocker. The importer/tests are CI-green; the remaining blocker is availability of the original local binding and qualification files.
 
 ### Stage 2 — D-F6-01
 
-Stage 2 has **not** been executed. Its task contract and runner are frozen. The runner no longer accepts a loose/local `--binding` argument. It requires `--binding-import`, pointing to the immutable directory produced by `ndv_import_wp04_binding.py`, and derives `executor-binding-v2.json` from that preserved evidence.
+Stage 2 has **not** been executed. Its task contract and runner are frozen. The runner no longer accepts a loose/local `--binding` argument. It requires `--binding-import`, pointing to the immutable directory produced by `ndv_import_wp04_binding.py`, and derives `executor-binding-v2.json` plus `qualification-evidence.json` from that preserved evidence.
 
 Before any D-F6-01 exposure, `tools/ndv_run_wp04_stage2_df601.py` requires:
 
 1. a hash-valid Stage-1 import manifest v2;
-2. `binding-import-receipt.json` with `status=ORIGINAL_BINDING_PRESERVED`;
-3. `binding_reconstructed=false`, `treatment_reexecuted=false`, holdout `NONE`;
+2. `binding-import-receipt.json` schema `ndv-wp04-binding-import-receipt-v2` with status `ORIGINAL_BINDING_AND_QUALIFICATION_PRESERVED`;
+3. `binding_reconstructed=false`, `qualification_reconstructed=false`, `treatment_reexecuted=false`, holdout `NONE`;
 4. exact preserved binding SHA-256/size match;
-5. binding receipt bound to the current preserved Stage-1 `run-report.json` SHA-256;
-6. the same binding ID used in Stage 1;
-7. the exact Aider executable path frozen in that binding;
-8. `aider --version` to exactly match the frozen Aider version;
-9. Ollama endpoint, installed model identity and model digest to exactly match the frozen binding;
-10. discriminating structural focal failure on the untouched historical base;
-11. all frozen Rust baseline oracle checks to pass;
-12. zero retry/escalation and sealed holdout.
+5. exact preserved qualification-evidence SHA-256/size match;
+6. qualification hash equality across the binding, receipt, and preserved qualification file;
+7. binding receipt bound to the current preserved Stage-1 `run-report.json` SHA-256;
+8. the same binding ID used in Stage 1;
+9. the exact Aider executable path frozen in that binding;
+10. `aider --version` to exactly match the frozen Aider version;
+11. Ollama endpoint, installed model identity and model digest to exactly match the frozen binding;
+12. discriminating structural focal failure on the untouched historical base;
+13. all frozen Rust baseline oracle checks to pass;
+14. zero retry/escalation and sealed holdout.
 
 The Ollama identity gate reads only the local `/api/tags` inventory and aborts before task materialization/exposure if endpoint, model name or digest has drifted. It does not download, retag, update or repair the model.
 
-The preserved-binding gate is intentionally stronger than a binding-ID check: a freshly reconstructed JSON file with the same ID is not authorized for Stage 2.
+The preserved-binding gate is intentionally stronger than a binding-ID check: a freshly reconstructed JSON file with the same ID, or a replacement qualification artifact with matching prose but different bytes, is not authorized for Stage 2.
 
 ## Import and campaign closure
 
@@ -126,17 +138,19 @@ WP-03 = PASS
 WP-04_CONTRACT = FROZEN
 WP-04_EXECUTOR_BINDING_V2 = FROZEN / QUALIFIED AT STAGE1 EXECUTION
 WP-04_ORIGINAL_BINDING_BYTES_IN_REPO = NO
+WP-04_ORIGINAL_QUALIFICATION_BYTES_IN_REPO = NO
+WP-04_BINDING_IMPORT_RECEIPT = V2 REQUIRED
 WP-04_BINDING_IMPORT_TOOLING = PASS
-WP-04_STAGE2_PRESERVED_BINDING_GATE = PASS (CI 35175339121)
+WP-04_STAGE2_PRESERVED_BINDING_GATE = PASS (CI 35230438193)
 WP-04_STAGE1_D-F5-01 = EXECUTED
 WP-04_STAGE1_OUTCOME = SMOKE_VALID_FAILED
 WP-04_STAGE1_RAW_EVIDENCE = PRESERVED
 WP-04_STAGE1_IMPORT_V1 = HISTORICAL
 WP-04_STAGE1_IMPORT_V2_SIDECAR = TOOLING_READY / NOT_YET_PERSISTED
-WP-04_STAGE2_D-F6-01 = BLOCKED_ON_ORIGINAL_BINDING_PRESERVATION
+WP-04_STAGE2_D-F6-01 = BLOCKED_ON_ORIGINAL_BINDING_AND_QUALIFICATION_PRESERVATION
 WP-04_CAMPAIGN_CLOSURE = NOT_COMPLETE
 COMPARATIVE_AUTHORITY = NONE
 ARCHITECTURE_AUTHORITY = NONE
 ```
 
-The next execution gate is: import the **original** binding-v2 bytes, create/revalidate the Stage-1 v2 sidecar, and only then run D-F6-01 once using `--binding-import` against the preserved binding directory. No Stage-2 exposure is authorized if the binding/receipt/sidecar/hash/scaffold/model gates fail.
+The next execution gate is: import the **original** binding-v2 bytes and exact qualification-evidence bytes, create/revalidate the Stage-1 v2 sidecar, and only then run D-F6-01 once using `--binding-import` against the preserved evidence directory. No Stage-2 exposure is authorized if the binding/qualification/receipt/sidecar/hash/scaffold/model gates fail.
