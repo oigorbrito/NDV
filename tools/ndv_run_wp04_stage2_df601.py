@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
-"""Run WP-04 Stage 2 (D-F6-01) after Stage 1 evidence import.
+"""Run WP-04 Stage 2 (D-F6-01) after Stage 1 evidence/binding preservation.
 
 The runner materializes the exact historical base, proves the structural focal
 fails on base while the historical Rust oracle passes, invokes the same frozen
 Aider+Ollama binding exactly once, captures the candidate, and verifies it.
+Stage 2 accepts only the original binding bytes preserved by
+ndv_import_wp04_binding.py; a loose/reconstructed binding is not sufficient.
 """
 from __future__ import annotations
 
@@ -41,6 +43,14 @@ def sha256_bytes(data: bytes) -> str:
 
 def sha256_text(text: str) -> str:
     return sha256_bytes(text.encode("utf-8"))
+
+
+def sha256_file(path: Path) -> str:
+    h = hashlib.sha256()
+    with path.open("rb") as fh:
+        for chunk in iter(lambda: fh.read(1024 * 1024), b""):
+            h.update(chunk)
+    return h.hexdigest()
 
 
 def require_clean_exact_base(workspace: Path, base_sha: str) -> None:
@@ -129,6 +139,34 @@ def validate_stage1_import(path: Path, binding_id: str) -> dict[str, Any]:
     return manifest
 
 
+def load_preserved_binding(binding_import: Path, stage1_import: Path) -> tuple[dict[str, Any], dict[str, Any], Path]:
+    root = binding_import.resolve()
+    receipt_path = root / "binding-import-receipt.json"
+    binding_path = root / "executor-binding-v2.json"
+    stage1_report = stage1_import.resolve() / "run-report.json"
+    if not receipt_path.is_file() or not binding_path.is_file():
+        raise ValueError("preserved binding requires binding-import-receipt.json and executor-binding-v2.json")
+    if not stage1_report.is_file():
+        raise ValueError("Stage 1 run-report missing while validating preserved binding")
+    receipt, binding = load(receipt_path), load(binding_path)
+    if receipt.get("schema_id") != "ndv-wp04-binding-import-receipt-v1" or receipt.get("status") != "ORIGINAL_BINDING_PRESERVED":
+        raise ValueError("original binding preservation receipt invalid")
+    if receipt.get("binding_reconstructed") is not False or receipt.get("treatment_reexecuted") is not False or receipt.get("holdout_access") != "NONE":
+        raise ValueError("binding preservation provenance invalid")
+    if receipt.get("preserved_binding_ref") != "executor-binding-v2.json":
+        raise ValueError("binding receipt does not reference canonical preserved binding filename")
+    data = binding_path.read_bytes()
+    if sha256_bytes(data) != receipt.get("binding_file_sha256") or len(data) != receipt.get("binding_file_size_bytes"):
+        raise ValueError("preserved binding hash/size mismatch")
+    if receipt.get("stage1_report_sha256") != sha256_file(stage1_report):
+        raise ValueError("binding receipt does not bind to the current preserved Stage 1 report")
+    if binding.get("schema_id") != "ndv-p1-wp04-executor-binding-v2" or binding.get("status") != "QUALIFIED":
+        raise ValueError("preserved binding is not a qualified binding-v2")
+    if binding.get("binding_id") != receipt.get("binding_id") or binding.get("exact_executor_identity") != receipt.get("exact_executor_identity"):
+        raise ValueError("preserved binding identity differs from import receipt")
+    return binding, receipt, binding_path
+
+
 def resolve_frozen_aider(binding: dict[str, Any], explicit: Path | None) -> str:
     frozen = binding.get("scaffold", {}).get("executable_path")
     if not isinstance(frozen, str) or not frozen:
@@ -163,7 +201,7 @@ def validate_ollama_model(binding: dict[str, Any]) -> dict[str, str]:
         raise ValueError(f"unexpected frozen Ollama endpoint: {endpoint!r}")
     if not isinstance(expected_name, str) or not expected_name:
         raise ValueError("binding missing frozen model identity")
-    if not isinstance(expected_digest, str) or len(expected_digest) != 64:
+    if not isinstance(expected_digest, str) or len(expected_digest) != 64 or any(ch not in "0123456789abcdef" for ch in expected_digest):
         raise ValueError("binding missing exact 64-hex model digest")
     try:
         with urllib.request.urlopen(endpoint + "/api/tags", timeout=10) as response:
@@ -184,7 +222,7 @@ def validate_ollama_model(binding: dict[str, Any]) -> dict[str, str]:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--binding", required=True, type=Path)
+    ap.add_argument("--binding-import", required=True, type=Path, help="Directory produced by ndv_import_wp04_binding.py")
     ap.add_argument("--source-repo", required=True, type=Path)
     ap.add_argument("--stage1-import", required=True, type=Path)
     ap.add_argument("--aider-exe", type=Path)
@@ -193,12 +231,10 @@ def main() -> int:
     args = ap.parse_args()
 
     task = load(TASK_PATH)
-    binding = load(args.binding)
-    if binding.get("schema_id") != "ndv-p1-wp04-executor-binding-v2" or binding.get("status") != "QUALIFIED":
-        raise SystemExit("qualified binding-v2 required")
-    if binding.get("retry_limit") != 0 or binding.get("escalation_limit") != 0:
-        raise SystemExit("WP-04 Stage 2 forbids retry/escalation")
     try:
+        binding, binding_receipt, binding_path = load_preserved_binding(args.binding_import, args.stage1_import)
+        if binding.get("retry_limit") != 0 or binding.get("escalation_limit") != 0:
+            raise ValueError("WP-04 Stage 2 forbids retry/escalation")
         stage1_manifest = validate_stage1_import(args.stage1_import.resolve(), str(binding.get("binding_id")))
         aider = resolve_frozen_aider(binding, args.aider_exe)
         aider_version = validate_aider_version(aider, binding)
@@ -280,6 +316,10 @@ def main() -> int:
         "task_id": task["task_id"],
         "base_sha": task["base_sha"],
         "binding_id": binding.get("binding_id"),
+        "binding_import_receipt_schema": binding_receipt.get("schema_id"),
+        "binding_import_receipt_sha256": sha256_file(args.binding_import.resolve() / "binding-import-receipt.json"),
+        "preserved_binding_ref": str(binding_path),
+        "preserved_binding_sha256": sha256_file(binding_path),
         "executor_identity": binding.get("exact_executor_identity"),
         "aider_version_revalidated": aider_version,
         "ollama_model_revalidated": ollama_model,
