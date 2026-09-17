@@ -39,6 +39,8 @@ on:
       - 'tools/test_ndv_materialize_wp07_codex_workspace.py'
       - 'tools/ndv_run_wp07_codex_single_hop.py'
       - 'tools/test_ndv_run_wp07_codex_single_hop.py'
+      - 'tools/ndv_verify_wp07_codex_single_hop.py'
+      - 'tools/test_ndv_verify_wp07_codex_single_hop.py'
       - 'tools/ndv_promote_wp04_binding_to_wp07.py'
       - 'tools/test_ndv_promote_wp04_binding_to_wp07.py'
       - 'tools/ndv_wp07_preflight.py'
@@ -86,6 +88,8 @@ on:
       - 'tools/test_ndv_materialize_wp07_codex_workspace.py'
       - 'tools/ndv_run_wp07_codex_single_hop.py'
       - 'tools/test_ndv_run_wp07_codex_single_hop.py'
+      - 'tools/ndv_verify_wp07_codex_single_hop.py'
+      - 'tools/test_ndv_verify_wp07_codex_single_hop.py'
       - 'tools/ndv_promote_wp04_binding_to_wp07.py'
       - 'tools/test_ndv_promote_wp04_binding_to_wp07.py'
       - 'tools/ndv_wp07_preflight.py'
@@ -123,6 +127,7 @@ jobs:
           python -m py_compile tools/ndv_parse_codex_jsonl_usage.py
           python -m py_compile tools/ndv_materialize_wp07_codex_workspace.py
           python -m py_compile tools/ndv_run_wp07_codex_single_hop.py
+          python -m py_compile tools/ndv_verify_wp07_codex_single_hop.py
           python -m py_compile tools/ndv_promote_wp04_binding_to_wp07.py
           python -m py_compile tools/ndv_wp07_preflight.py
           python -m py_compile tools/ndv_materialize_wp07_run_matrix.py
@@ -146,6 +151,7 @@ jobs:
               assert x['treatment_execution']=='NOT_EXECUTED'
           budgets=json.loads(pathlib.Path('experiments/p1/wp07-execution-budgets-v1.json').read_text())
           assert budgets['executor_timeout_ms_per_hop']==1800000
+          assert budgets['verification_reserve_ms']==1800000
           assert budgets['treatments']['B0']['retry_limit']==0
           assert budgets['treatments']['B2']['escalation_limit']==1
           template=json.loads(pathlib.Path('experiments/p1/run-spec-v1.template.json').read_text())
@@ -175,6 +181,7 @@ jobs:
           python -m unittest -v test_ndv_parse_codex_jsonl_usage.py
           python -m unittest -v test_ndv_materialize_wp07_codex_workspace.py
           python -m unittest -v test_ndv_run_wp07_codex_single_hop.py
+          python -m unittest -v test_ndv_verify_wp07_codex_single_hop.py
           python -m unittest -v test_ndv_promote_wp04_binding_to_wp07.py
           python -m unittest -v test_ndv_wp07_preflight.py
           python -m unittest -v test_ndv_materialize_wp07_run_matrix.py
