@@ -13,6 +13,9 @@ on:
       - 'tools/ndv_acquire_s2_pinned_parquet.py'
       - 'tools/ndv_materialize_s2_wave.py'
       - 'tools/ndv_prepare_s2_base_audit_plan.py'
+      - 'tools/ndv_acquire_s2_images.py'
+      - 'tools/ndv_bind_s2_audit_plan_images.py'
+      - 'tools/ndv_execute_s2_base_audit_plan.py'
       - 'tools/ndv_validate_corpus_intake.py'
       - 'tools/ndv_extract_pinned_swe_rebench_rows.py'
       - 'tools/ndv_quarantine_swe_rebench_rows.py'
@@ -25,6 +28,9 @@ on:
       - 'tools/test_ndv_acquire_s2_pinned_parquet.py'
       - 'tools/test_ndv_materialize_s2_wave.py'
       - 'tools/test_ndv_prepare_s2_base_audit_plan.py'
+      - 'tools/test_ndv_acquire_s2_images.py'
+      - 'tools/test_ndv_bind_s2_audit_plan_images.py'
+      - 'tools/test_ndv_execute_s2_base_audit_plan.py'
       - 'tools/test_ndv_validate_corpus_intake.py'
       - 'tools/test_ndv_extract_pinned_swe_rebench_rows.py'
       - 'tools/test_ndv_quarantine_swe_rebench_rows.py'
@@ -48,6 +54,9 @@ on:
       - 'tools/ndv_acquire_s2_pinned_parquet.py'
       - 'tools/ndv_materialize_s2_wave.py'
       - 'tools/ndv_prepare_s2_base_audit_plan.py'
+      - 'tools/ndv_acquire_s2_images.py'
+      - 'tools/ndv_bind_s2_audit_plan_images.py'
+      - 'tools/ndv_execute_s2_base_audit_plan.py'
       - 'tools/ndv_validate_corpus_intake.py'
       - 'tools/ndv_extract_pinned_swe_rebench_rows.py'
       - 'tools/ndv_quarantine_swe_rebench_rows.py'
@@ -60,6 +69,9 @@ on:
       - 'tools/test_ndv_acquire_s2_pinned_parquet.py'
       - 'tools/test_ndv_materialize_s2_wave.py'
       - 'tools/test_ndv_prepare_s2_base_audit_plan.py'
+      - 'tools/test_ndv_acquire_s2_images.py'
+      - 'tools/test_ndv_bind_s2_audit_plan_images.py'
+      - 'tools/test_ndv_execute_s2_base_audit_plan.py'
       - 'tools/test_ndv_validate_corpus_intake.py'
       - 'tools/test_ndv_extract_pinned_swe_rebench_rows.py'
       - 'tools/test_ndv_quarantine_swe_rebench_rows.py'
@@ -89,6 +101,9 @@ jobs:
           python -m py_compile tools/ndv_acquire_s2_pinned_parquet.py
           python -m py_compile tools/ndv_materialize_s2_wave.py
           python -m py_compile tools/ndv_prepare_s2_base_audit_plan.py
+          python -m py_compile tools/ndv_acquire_s2_images.py
+          python -m py_compile tools/ndv_bind_s2_audit_plan_images.py
+          python -m py_compile tools/ndv_execute_s2_base_audit_plan.py
           python -m py_compile tools/ndv_validate_corpus_intake.py
           python -m py_compile tools/ndv_extract_pinned_swe_rebench_rows.py
           python -m py_compile tools/ndv_quarantine_swe_rebench_rows.py
@@ -124,6 +139,9 @@ jobs:
           python -m unittest -v test_ndv_acquire_s2_pinned_parquet.py
           python -m unittest -v test_ndv_materialize_s2_wave.py
           python -m unittest -v test_ndv_prepare_s2_base_audit_plan.py
+          python -m unittest -v test_ndv_acquire_s2_images.py
+          python -m unittest -v test_ndv_bind_s2_audit_plan_images.py
+          python -m unittest -v test_ndv_execute_s2_base_audit_plan.py
           python -m unittest -v test_ndv_validate_corpus_intake.py
           python -m unittest -v test_ndv_extract_pinned_swe_rebench_rows.py
           python -m unittest -v test_ndv_quarantine_swe_rebench_rows.py
