@@ -19,7 +19,7 @@ class FamilyAssignmentTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError,'invalid family'): mod.apply(state,assignments,taxonomy)
     def test_state_hash_mismatch_rejected(self):
         with tempfile.TemporaryDirectory() as tmp:
-            root=Path(tmp); state,assignments,taxonomy=self.fixture(root); state.write_text('{}')
+            root=Path(tmp); state,assignments,taxonomy=self.fixture(root); p=json.loads(state.read_text()); p['note']='changed bytes while preserving valid state schema'; state.write_text(json.dumps(p))
             with self.assertRaisesRegex(ValueError,'candidate-state hash mismatch'): mod.apply(state,assignments,taxonomy)
 
 if __name__=='__main__': unittest.main()
