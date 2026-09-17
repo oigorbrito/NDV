@@ -1,0 +1,54 @@
+{
+  "schema_id": "ndv-p1-wp07-codex-treatment-execution-v1",
+  "status": "PROSPECTIVE_FROZEN_NOT_EXECUTED",
+  "scope": "development P1-S2 Codex subscription execution only",
+  "prerequisites": {
+    "run_spec_schema": "ndv-p1-s2-run-spec-v1",
+    "run_spec_execution_status": "NOT_EXECUTED",
+    "run_spec_holdout": "DEVELOPMENT_ONLY",
+    "codex_preflight_status": "CODEX_RUN_SPEC_PREFLIGHT_PASS",
+    "execution_surface_contract": "experiments/p1/wp07-codex-execution-surface-v1.json",
+    "accounting_contract": "experiments/p1/run-accounting-contract-v1.json",
+    "failure_attribution_contract": "experiments/p1/failure-attribution-v1.json"
+  },
+  "task_prompt_source": {
+    "authority": "ADMITTED_FROZEN.source_binding.executor_visible_ref",
+    "required_schema": "ndv-p1-s2-executor-visible-row-v1",
+    "allowed_task_fields": ["instance_id", "repo", "base_commit", "problem_statement", "language"],
+    "forbidden_sources": ["admission-only.full_row", "patch", "test_patch", "FAIL_TO_PASS", "PASS_TO_PASS", "pr_description"],
+    "s0_rule": "problem_statement bytes normalized only to one terminal newline",
+    "s1_rule": "deterministic wrapper around the same executor-visible projection; no solution, gold, patch, test_patch, hidden admission fields, or LLM planning"
+  },
+  "codex_jsonl_usage": {
+    "source_repository": "openai/codex",
+    "source_commit_observed": "7abf2a3b5cbe08ca875d677dcd027528f9556152",
+    "source_path": "sdk/typescript/src/events.ts",
+    "event_type": "turn.completed",
+    "usage_fields": ["input_tokens", "cached_input_tokens", "cache_write_input_tokens", "output_tokens", "reasoning_output_tokens"],
+    "aggregation": "sum every valid turn.completed usage event in one executor invocation",
+    "missing_field_rule": "MISSING_NOT_ZERO",
+    "malformed_jsonl_rule": "ACCOUNTING_INTEGRITY_FAILURE",
+    "negative_usage_rule": "ACCOUNTING_INTEGRITY_FAILURE"
+  },
+  "executor_event_semantics": {
+    "process_timeout": "RESOURCE_LIMIT",
+    "process_nonzero_or_turn_failed_or_error_event": "PROVIDER_FAILURE unless stronger evidence attributes harness/environment",
+    "process_zero_with_candidate_diff": "EXECUTOR_CANDIDATE_PRODUCED; final treatment outcome waits for focal+preservation verification",
+    "process_zero_without_candidate_diff": "candidate absence; deterministic escalation trigger only where preregistered, otherwise candidate failure evidence",
+    "model_self_report": "NON_AUTHORITATIVE"
+  },
+  "single_hop_treatments": ["B0", "B1", "B3"],
+  "cascade_treatments": {
+    "B2": ["PRIMARY_ECONOMIC", "ESCALATION_STRONG"],
+    "B4": ["PRIMARY_LOCAL_OR_FREE", "ESCALATION_STRONG"]
+  },
+  "cascade_rule": "hop 2 may execute only after one preregistered escalation trigger from the frozen WP-07 comparison protocol; no subjective or manual trigger",
+  "retry_limit_per_hop": 0,
+  "implicit_fallback": false,
+  "dynamic_routing": false,
+  "candidate_artifact": "git diff --binary against exact frozen base",
+  "cost_rule": "all consumed hop and verifier resources remain accounted on solved, failed, or inconclusive runs",
+  "task_exposure_before_execution": false,
+  "treatment_execution": "NOT_EXECUTED",
+  "holdout_access": "NONE"
+}
