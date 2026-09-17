@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Freeze one NDV S2 admission decision into an immutable admission record.
 
-Admission is allowed only when global schemas are valid, the decision is still
-bound to the exact candidate/audit evidence, and every referenced artifact is
-re-read and re-hashed successfully. Metadata declarations alone are insufficient.
+The frozen discovery wave is not mutable admission state. Freeze consumes the
+post-quarantine, family-assigned candidate evidence state v2 and independently
+re-reads/re-hashes all candidate + audit artifacts before emitting ADMITTED_FROZEN.
 """
 from __future__ import annotations
 
@@ -16,8 +16,15 @@ from typing import Any
 
 SHA256 = re.compile(r"^[0-9a-f]{64}$")
 DIGEST = re.compile(r"^sha256:[0-9a-f]{64}$")
-AUDIT_HASH_FIELDS = ("base_run_sha256", "oracle_interpretation_sha256", "focal_verifier_sha256", "preservation_sha256", "verifier_provenance_sha256", "environment_sha256")
-DECISION_REF_FIELDS = ("quarantine_manifest_ref", "admission_only_ref", "executor_visible_ref", "base_run_ref", "oracle_interpretation_ref", "focal_verifier_ref", "preservation_ref", "verifier_provenance_ref", "environment_ref")
+AUDIT_HASH_FIELDS = (
+    "base_run_sha256", "oracle_interpretation_sha256", "focal_verifier_sha256",
+    "preservation_sha256", "verifier_provenance_sha256", "environment_sha256",
+)
+DECISION_REF_FIELDS = (
+    "quarantine_manifest_ref", "admission_only_ref", "executor_visible_ref",
+    "base_run_ref", "oracle_interpretation_ref", "focal_verifier_ref",
+    "preservation_ref", "verifier_provenance_ref", "environment_ref",
+)
 
 
 def load(path: Path) -> Any:
@@ -49,31 +56,29 @@ def require_sha(name: str, value: Any) -> str:
 def find(items: Any, cid: str) -> dict[str, Any]:
     if not isinstance(items, list):
         raise ValueError("expected array of candidate records")
-    matches = [item for item in items if isinstance(item, dict) and item.get("candidate_id") == cid]
+    matches = [x for x in items if isinstance(x, dict) and x.get("candidate_id") == cid]
     if len(matches) != 1:
         raise ValueError(f"expected exactly one candidate_id={cid}, found {len(matches)}")
     return matches[0]
 
 
-def validate_global_inputs(wave: dict[str, Any], audit_state: dict[str, Any], decisions: dict[str, Any]) -> None:
-    if wave.get("schema_id") != "ndv-p1-s2-candidate-wave-v1":
-        raise ValueError("unexpected candidate wave schema")
-    summary = wave.get("wave_summary")
-    if not isinstance(summary, dict) or summary.get("treatment_execution") != "NOT_EXECUTED" or summary.get("holdout_access") != "NONE":
-        raise ValueError("candidate wave is treatment/holdout contaminated")
+def validate_global_inputs(candidate_state: dict[str, Any], audit_state: dict[str, Any], decisions: dict[str, Any]) -> None:
+    if candidate_state.get("schema_id") != "ndv-p1-s2-candidate-evidence-state-v2":
+        raise ValueError("candidate evidence state v2 required")
+    if candidate_state.get("treatment_execution") != "NOT_EXECUTED" or candidate_state.get("holdout_access") != "NONE":
+        raise ValueError("candidate evidence state is treatment/holdout contaminated")
     if audit_state.get("schema_id") != "ndv-p1-s2-audit-state-v1" or audit_state.get("holdout_access") != "NONE":
         raise ValueError("unexpected or holdout-contaminated audit state")
     if decisions.get("schema_id") != "ndv-p1-s2-admission-decisions-v2":
         raise ValueError("unexpected admission decisions schema")
     if decisions.get("treatment_execution") != "NOT_EXECUTED" or decisions.get("holdout_access") != "NONE":
         raise ValueError("admission decisions are treatment/holdout contaminated")
-    if decisions.get("wave_id") != wave.get("wave_id"):
+    if decisions.get("wave_id") != candidate_state.get("wave_id"):
         raise ValueError("admission decisions wave_id mismatch")
 
 
 def validate_decision_snapshot(candidate: dict[str, Any], audit: dict[str, Any], decision: dict[str, Any]) -> None:
-    refs = decision.get("evidence_refs")
-    hashes = decision.get("evidence_hashes")
+    refs, hashes = decision.get("evidence_refs"), decision.get("evidence_hashes")
     if not isinstance(refs, dict) or not isinstance(hashes, dict):
         raise ValueError("decision must freeze evidence_refs and evidence_hashes")
     expected_refs = {
@@ -133,6 +138,12 @@ def verify_canonical_json_hash(root: Path, ref: Any, expected: Any, name: str) -
     return path, payload
 
 
+def pure_repo_digest(value: Any) -> str | None:
+    if not isinstance(value, str) or "@sha256:" not in value:
+        return None
+    return "sha256:" + value.split("@sha256:", 1)[1]
+
+
 def verify_candidate_artifacts(candidate: dict[str, Any], root: Path) -> dict[str, str]:
     cid = candidate["candidate_id"]
     raw_sha = require_sha("ndv_canonical_row_sha256", candidate.get("ndv_canonical_row_sha256"))
@@ -142,7 +153,7 @@ def verify_candidate_artifacts(candidate: dict[str, Any], root: Path) -> dict[st
 
     admission_path = resolve_ref(root, candidate.get("admission_only_ref"), "admission_only_ref")
     admission = load(admission_path)
-    if not isinstance(admission, dict) or admission.get("schema_id") != "ndv-p1-s2-admission-only-row-v1" or admission.get("candidate_id") != cid:
+    if admission.get("schema_id") != "ndv-p1-s2-admission-only-row-v1" or admission.get("candidate_id") != cid:
         raise ValueError("admission-only artifact identity/schema mismatch")
     source, row = admission.get("source"), admission.get("full_row")
     if not isinstance(source, dict) or not isinstance(row, dict):
@@ -157,7 +168,7 @@ def verify_candidate_artifacts(candidate: dict[str, Any], root: Path) -> dict[st
 
     executor_path = resolve_ref(root, candidate.get("executor_visible_ref"), "executor_visible_ref")
     executor = load(executor_path)
-    if not isinstance(executor, dict) or executor.get("schema_id") != "ndv-p1-s2-executor-visible-row-v1" or executor.get("candidate_id") != cid:
+    if executor.get("schema_id") != "ndv-p1-s2-executor-visible-row-v1" or executor.get("candidate_id") != cid:
         raise ValueError("executor-visible artifact identity/schema mismatch")
     binding, task = executor.get("source_binding"), executor.get("task")
     if not isinstance(binding, dict) or not isinstance(task, dict):
@@ -171,13 +182,25 @@ def verify_candidate_artifacts(candidate: dict[str, Any], root: Path) -> dict[st
 
     manifest_path = resolve_ref(root, candidate.get("quarantine_manifest_ref"), "quarantine_manifest_ref")
     manifest = load(manifest_path)
-    if not isinstance(manifest, dict) or manifest.get("schema_id") != "ndv-p1-s2-quarantine-manifest-v2" or manifest.get("candidate_id") != cid or manifest.get("status") != "PASS":
+    if manifest.get("schema_id") != "ndv-p1-s2-quarantine-manifest-v2" or manifest.get("candidate_id") != cid or manifest.get("status") != "PASS":
         raise ValueError("quarantine manifest identity/schema/status mismatch")
-    expected = {"source_row_index": row_index, "source_instance_id": candidate.get("source_instance_id"), "ndv_canonical_row_sha256": raw_sha, "task_statement_sha256": task_sha, "executor_visible_sha256": executor_sha, "treatment_execution": "NOT_EXECUTED", "holdout_access": "NONE"}
+    expected = {
+        "source_row_index": row_index,
+        "source_instance_id": candidate.get("source_instance_id"),
+        "ndv_canonical_row_sha256": raw_sha,
+        "task_statement_sha256": task_sha,
+        "executor_visible_sha256": executor_sha,
+        "treatment_execution": "NOT_EXECUTED",
+        "holdout_access": "NONE",
+    }
     for field, value in expected.items():
         if manifest.get(field) != value:
             raise ValueError(f"quarantine manifest {field} mismatch")
-    return {"admission_only_file_sha256": sha256_file(admission_path), "executor_visible_file_sha256": sha256_file(executor_path), "quarantine_manifest_file_sha256": sha256_file(manifest_path)}
+    return {
+        "admission_only_file_sha256": sha256_file(admission_path),
+        "executor_visible_file_sha256": sha256_file(executor_path),
+        "quarantine_manifest_file_sha256": sha256_file(manifest_path),
+    }
 
 
 def verify_audit_artifacts(candidate: dict[str, Any], audit: dict[str, Any], root: Path) -> dict[str, str]:
@@ -187,6 +210,8 @@ def verify_audit_artifacts(candidate: dict[str, Any], audit: dict[str, Any], roo
         raise ValueError("base run identity/base/harness mismatch")
     if base.get("gold_patch_applied") is not False or base.get("test_patch_applied") is not False or base.get("treatment_execution") != "NOT_EXECUTED" or base.get("holdout_access") != "NONE":
         raise ValueError("base run contamination detected")
+    if pure_repo_digest(base.get("image_digest")) != audit.get("image_digest"):
+        raise ValueError("base run/audit image digest mismatch")
 
     oracle_path, oracle = verify_file_hash(root, audit.get("oracle_interpretation_ref"), audit.get("oracle_interpretation_sha256"), "oracle_interpretation")
     if oracle.get("schema_id") != "ndv-p1-s2-base-oracle-interpretation-v2" or oracle.get("candidate_id") != cid or oracle.get("classification") != "EXPECTED_BASE_BEHAVIOR":
@@ -201,8 +226,16 @@ def verify_audit_artifacts(candidate: dict[str, Any], audit: dict[str, Any], roo
         if payload.get("instance_id") != candidate.get("source_instance_id") or payload.get("base_commit") != candidate.get("base_revision") or payload.get("source_row_index") != candidate.get("source_row_index"):
             raise ValueError(f"{name} verifier source binding mismatch")
 
-    environment_path, _ = verify_file_hash(root, audit.get("environment_ref"), audit.get("environment_sha256"), "environment")
-    return {"base_run_file_sha256": sha256_file(base_path), "oracle_interpretation_file_sha256": sha256_file(oracle_path), "environment_file_sha256": sha256_file(environment_path)}
+    environment_path, environment = verify_file_hash(root, audit.get("environment_ref"), audit.get("environment_sha256"), "environment")
+    if environment.get("candidate_id") != cid or environment.get("base_revision") != candidate.get("base_revision") or environment.get("image_digest") != audit.get("image_digest"):
+        raise ValueError("environment evidence identity/digest mismatch")
+    if environment.get("treatment_execution") != "NOT_EXECUTED" or environment.get("holdout_access") != "NONE":
+        raise ValueError("environment evidence contamination detected")
+    return {
+        "base_run_file_sha256": sha256_file(base_path),
+        "oracle_interpretation_file_sha256": sha256_file(oracle_path),
+        "environment_file_sha256": sha256_file(environment_path),
+    }
 
 
 def freeze(candidate: dict[str, Any], audit: dict[str, Any], decision: dict[str, Any], artifact_integrity: dict[str, str] | None = None) -> dict[str, Any]:
@@ -226,21 +259,48 @@ def freeze(candidate: dict[str, Any], audit: dict[str, Any], decision: dict[str,
     if candidate.get("quarantine_status") != "PASS" or candidate.get("solution_isolation") not in {"PASS", "PROVEN"}:
         raise ValueError("quarantine and solution isolation required")
     family = candidate.get("proposed_family")
-    if family in {None, "", "UNASSIGNED_PENDING_SCREEN"}:
-        raise ValueError("assigned family required")
+    assignment = candidate.get("family_assignment")
+    if family not in {"F1", "F2", "F3", "F4", "F5", "F6"} or not isinstance(assignment, dict) or assignment.get("family") != family or assignment.get("performance_based") is not False:
+        raise ValueError("valid pre-treatment family assignment required")
     row_index = candidate.get("source_row_index")
     if not isinstance(row_index, int) or row_index < 0:
         raise ValueError("valid source_row_index required")
     if artifact_integrity is None:
         raise ValueError("verified artifact integrity evidence required")
 
-    task_sha = require_sha("task_statement_sha256", candidate.get("task_statement_sha256")); raw_sha = require_sha("ndv_canonical_row_sha256", candidate.get("ndv_canonical_row_sha256")); executor_sha = require_sha("executor_visible_sha256", candidate.get("executor_visible_sha256"))
+    task_sha = require_sha("task_statement_sha256", candidate.get("task_statement_sha256"))
+    raw_sha = require_sha("ndv_canonical_row_sha256", candidate.get("ndv_canonical_row_sha256"))
+    executor_sha = require_sha("executor_visible_sha256", candidate.get("executor_visible_sha256"))
     audit_hashes = {field: require_sha(field, audit.get(field)) for field in AUDIT_HASH_FIELDS}
     record = {
-        "schema_id": "ndv-p1-s2-admission-record-v2", "candidate_id": cid,
-        "source_instance_id": candidate.get("source_instance_id"), "source_row_index": row_index, "repository": candidate.get("repository"), "base_revision": candidate.get("base_revision"), "language": candidate.get("language"), "family": family,
-        "source_binding": {"task_statement_sha256": task_sha, "ndv_canonical_row_sha256": raw_sha, "admission_only_ref": candidate.get("admission_only_ref"), "executor_visible_ref": candidate.get("executor_visible_ref"), "executor_visible_sha256": executor_sha, "quarantine_manifest_ref": candidate.get("quarantine_manifest_ref")},
-        "audit": {"image_digest": digest, "harness_integrity": "PASS", "base_run_ref": audit.get("base_run_ref"), "base_run_sha256": audit_hashes["base_run_sha256"], "oracle_interpretation_ref": audit.get("oracle_interpretation_ref"), "oracle_interpretation_sha256": audit_hashes["oracle_interpretation_sha256"], "focal_verifier_ref": audit.get("focal_verifier_ref"), "focal_verifier_sha256": audit_hashes["focal_verifier_sha256"], "preservation_ref": audit.get("preservation_ref"), "preservation_sha256": audit_hashes["preservation_sha256"], "verifier_provenance_ref": audit.get("verifier_provenance_ref"), "verifier_provenance_sha256": audit_hashes["verifier_provenance_sha256"], "environment_ref": audit.get("environment_ref"), "environment_sha256": audit_hashes["environment_sha256"], "oracle_classification": "EXPECTED_BASE_BEHAVIOR"},
+        "schema_id": "ndv-p1-s2-admission-record-v2",
+        "candidate_id": cid,
+        "source_instance_id": candidate.get("source_instance_id"),
+        "source_row_index": row_index,
+        "repository": candidate.get("repository"),
+        "base_revision": candidate.get("base_revision"),
+        "language": candidate.get("language"),
+        "family": family,
+        "family_assignment": assignment,
+        "source_binding": {
+            "task_statement_sha256": task_sha,
+            "ndv_canonical_row_sha256": raw_sha,
+            "admission_only_ref": candidate.get("admission_only_ref"),
+            "executor_visible_ref": candidate.get("executor_visible_ref"),
+            "executor_visible_sha256": executor_sha,
+            "quarantine_manifest_ref": candidate.get("quarantine_manifest_ref"),
+        },
+        "audit": {
+            "image_digest": digest,
+            "harness_integrity": "PASS",
+            "base_run_ref": audit.get("base_run_ref"), "base_run_sha256": audit_hashes["base_run_sha256"],
+            "oracle_interpretation_ref": audit.get("oracle_interpretation_ref"), "oracle_interpretation_sha256": audit_hashes["oracle_interpretation_sha256"],
+            "focal_verifier_ref": audit.get("focal_verifier_ref"), "focal_verifier_sha256": audit_hashes["focal_verifier_sha256"],
+            "preservation_ref": audit.get("preservation_ref"), "preservation_sha256": audit_hashes["preservation_sha256"],
+            "verifier_provenance_ref": audit.get("verifier_provenance_ref"), "verifier_provenance_sha256": audit_hashes["verifier_provenance_sha256"],
+            "environment_ref": audit.get("environment_ref"), "environment_sha256": audit_hashes["environment_sha256"],
+            "oracle_classification": "EXPECTED_BASE_BEHAVIOR",
+        },
         "artifact_integrity": {"status": "VERIFIED", **artifact_integrity},
         "selection": {"treatment_performance_consulted": False, "treatment_execution_before_admission": False, "holdout_access": "NONE"},
         "status": "ADMITTED_FROZEN",
@@ -254,20 +314,42 @@ def freeze(candidate: dict[str, Any], audit: dict[str, Any], decision: dict[str,
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--wave", required=True, type=Path); ap.add_argument("--audit", required=True, type=Path); ap.add_argument("--decisions", required=True, type=Path); ap.add_argument("--candidate-id", required=True); ap.add_argument("--out", required=True, type=Path); ap.add_argument("--artifact-root", type=Path, default=Path(".")); args = ap.parse_args()
-    wave, audit_state, decisions = load(args.wave), load(args.audit), load(args.decisions)
-    if not all(isinstance(x, dict) for x in (wave, audit_state, decisions)):
+    ap.add_argument("--candidates", required=True, type=Path)
+    ap.add_argument("--audit", required=True, type=Path)
+    ap.add_argument("--decisions", required=True, type=Path)
+    ap.add_argument("--candidate-id", required=True)
+    ap.add_argument("--out", required=True, type=Path)
+    ap.add_argument("--artifact-root", type=Path, default=Path("."))
+    args = ap.parse_args()
+
+    candidate_state, audit_state, decisions = load(args.candidates), load(args.audit), load(args.decisions)
+    if not all(isinstance(x, dict) for x in (candidate_state, audit_state, decisions)):
         raise SystemExit("ADMISSION_FREEZE_BLOCKED: all inputs must be JSON objects")
     try:
-        validate_global_inputs(wave, audit_state, decisions)
-        candidate = find(wave.get("candidates"), args.candidate_id); audit = find(audit_state.get("audits"), args.candidate_id); decision = find(decisions.get("decisions"), args.candidate_id)
+        validate_global_inputs(candidate_state, audit_state, decisions)
+        candidate = find(candidate_state.get("candidates"), args.candidate_id)
+        audit = find(audit_state.get("audits"), args.candidate_id)
+        decision = find(decisions.get("decisions"), args.candidate_id)
         root = args.artifact_root.resolve()
         integrity = {**verify_candidate_artifacts(candidate, root), **verify_audit_artifacts(candidate, audit, root)}
         record = freeze(candidate, audit, decision, integrity)
+        record["candidate_state"] = {
+            "ref": str(args.candidates),
+            "file_sha256": sha256_file(args.candidates.resolve()),
+            "schema_id": candidate_state.get("schema_id"),
+            "wave_id": candidate_state.get("wave_id"),
+        }
+        record["record_sha256"] = sha256({k: v for k, v in record.items() if k != "record_sha256"})
     except ValueError as exc:
         raise SystemExit(f"ADMISSION_FREEZE_BLOCKED: {exc}") from exc
-    args.out.parent.mkdir(parents=True, exist_ok=True); args.out.write_text(json.dumps(record, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    print(json.dumps({"candidate_id": args.candidate_id, "status": record["status"], "record_sha256": record["record_sha256"], "artifact_integrity": "VERIFIED"}, indent=2)); return 0
+
+    args.out.parent.mkdir(parents=True, exist_ok=True)
+    if args.out.exists():
+        raise SystemExit(f"ADMISSION_FREEZE_BLOCKED: refusing overwrite: {args.out}")
+    args.out.write_text(json.dumps(record, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    print(json.dumps({"candidate_id": args.candidate_id, "status": record["status"], "record_sha256": record["record_sha256"], "artifact_integrity": "VERIFIED"}, indent=2))
+    return 0
 
 
-if __name__ == "__main__": raise SystemExit(main())
+if __name__ == "__main__":
+    raise SystemExit(main())
