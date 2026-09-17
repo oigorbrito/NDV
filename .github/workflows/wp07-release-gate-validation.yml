@@ -1,0 +1,31 @@
+name: WP-07 Release Gate Validation
+
+on:
+  push:
+    paths:
+      - 'tools/ndv_release_wp07_development_comparison.py'
+      - 'tools/test_ndv_release_wp07_development_comparison.py'
+      - '.github/workflows/wp07-release-gate-validation.yml'
+  pull_request:
+    paths:
+      - 'tools/ndv_release_wp07_development_comparison.py'
+      - 'tools/test_ndv_release_wp07_development_comparison.py'
+      - '.github/workflows/wp07-release-gate-validation.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Compile release gate
+        run: python -m py_compile tools/ndv_release_wp07_development_comparison.py
+      - name: Test release gate
+        working-directory: tools
+        run: python -m unittest -v test_ndv_release_wp07_development_comparison.py
