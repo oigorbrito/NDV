@@ -89,6 +89,21 @@ class BaseAuditTests(unittest.TestCase):
         self.assertNotIn("git apply", shell_script)
         self.assertEqual(result["returncode"], 1)
 
+    def test_image_repository_normalization(self):
+        self.assertEqual(audit.normalize_image_repository("docker.io/swerebenchv2/foo:tag"), "swerebenchv2/foo")
+        self.assertEqual(audit.normalize_image_repository("swerebenchv2/foo@sha256:" + "1" * 64), "swerebenchv2/foo")
+        self.assertEqual(audit.normalize_image_repository("registry.example:5000/org/repo:tag"), "registry.example:5000/org/repo")
+
+    def test_repo_digest_match_uses_same_repository(self):
+        self.assertTrue(audit.repo_digest_matches_image_ref(
+            "swerebenchv2/foo@sha256:" + "1" * 64,
+            "docker.io/swerebenchv2/foo:tag",
+        ))
+        self.assertFalse(audit.repo_digest_matches_image_ref(
+            "other/foo@sha256:" + "1" * 64,
+            "docker.io/swerebenchv2/foo:tag",
+        ))
+
     @patch("ndv_run_s2_base_audit.run")
     def test_digest_resolution_requires_repo_digest(self, mocked_run):
         class Result:
@@ -97,6 +112,29 @@ class BaseAuditTests(unittest.TestCase):
             stderr = ""
         mocked_run.return_value = Result()
         with self.assertRaises(RuntimeError):
+            audit.resolve_image_digest("registry.example/repo:tag")
+
+    @patch("ndv_run_s2_base_audit.run")
+    def test_digest_resolution_ignores_unrelated_alias(self, mocked_run):
+        good = "registry.example/repo@sha256:" + "1" * 64
+        bad = "registry.example/other@sha256:" + "2" * 64
+        class Result:
+            returncode = 0
+            stdout = __import__("json").dumps([bad, good])
+            stderr = ""
+        mocked_run.return_value = Result()
+        self.assertEqual(audit.resolve_image_digest("registry.example/repo:tag"), good)
+
+    @patch("ndv_run_s2_base_audit.run")
+    def test_multiple_matching_digests_are_rejected(self, mocked_run):
+        first = "registry.example/repo@sha256:" + "1" * 64
+        second = "registry.example/repo@sha256:" + "2" * 64
+        class Result:
+            returncode = 0
+            stdout = __import__("json").dumps([first, second])
+            stderr = ""
+        mocked_run.return_value = Result()
+        with self.assertRaisesRegex(RuntimeError, "multiple RepoDigests"):
             audit.resolve_image_digest("registry.example/repo:tag")
 
 
