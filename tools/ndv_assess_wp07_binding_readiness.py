@@ -8,6 +8,8 @@ import json
 from pathlib import Path
 from typing import Any
 
+from ndv_wp07_codex_bundle import verify_bundle
+
 EXPECTED = {
     "B0": ("STRONG_DIRECT", {"PRIMARY_STRONG"}),
     "B1": ("CHEAP_DIRECT_VERIFY", {"PRIMARY_ECONOMIC"}),
@@ -46,7 +48,8 @@ def resolve(root: Path, value: Any, label: str) -> Path:
 def verify_binding(root: Path, role: str, b: dict[str, Any]) -> None:
     missing = REQUIRED_BINDING_FIELDS - set(b)
     if missing: raise ValueError(f"{role}: binding fields missing: {sorted(missing)}")
-    if b.get("surface_class") not in ALLOWED_SURFACES: raise ValueError(f"{role}: invalid surface_class")
+    surface = b.get("surface_class")
+    if surface not in ALLOWED_SURFACES: raise ValueError(f"{role}: invalid surface_class")
     bref = resolve(root, b.get("binding_ref"), f"{role}.binding_ref")
     qref = resolve(root, b.get("qualification_ref"), f"{role}.qualification_ref")
     if sha_file(bref) != b.get("binding_file_sha256"): raise ValueError(f"{role}: binding hash mismatch")
@@ -55,6 +58,14 @@ def verify_binding(root: Path, role: str, b: dict[str, Any]) -> None:
     if payload.get("binding_id") != b.get("binding_id"): raise ValueError(f"{role}: binding_id mismatch")
     if payload.get("exact_executor_identity") != b.get("exact_executor_identity"): raise ValueError(f"{role}: executor identity mismatch")
     if payload.get("status") != "QUALIFIED": raise ValueError(f"{role}: binding is not QUALIFIED")
+    if surface == "SUBSCRIPTION_EXECUTOR_PINNED":
+        mref = resolve(root, b.get("evidence_manifest_ref"), f"{role}.evidence_manifest_ref")
+        if sha_file(mref) != b.get("evidence_manifest_sha256"): raise ValueError(f"{role}: evidence manifest hash mismatch")
+        sealed = verify_bundle(mref.parent)
+        if (mref.parent / "executor-binding.json").resolve() != bref or (mref.parent / "qualification.json").resolve() != qref:
+            raise ValueError(f"{role}: evidence manifest does not bind referenced binding/qualification files")
+        if sealed["binding"].get("binding_id") != b.get("binding_id"):
+            raise ValueError(f"{role}: sealed bundle binding_id mismatch")
 
 
 def assess(registry_path: Path, artifact_root: Path) -> dict[str, Any]:
