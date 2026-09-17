@@ -1,0 +1,22 @@
+{
+  "schema_id": "ndv-p1-s2-family-taxonomy-v1",
+  "purpose": "Freeze the historical F1-F6 task-family rubric for prospective S2 assignment without treatment-result influence.",
+  "source": {
+    "repository": "oigorbrito/dv",
+    "commit": "66f3a218fba800daed5d86fdfce386491b8ab0e8",
+    "path": "docs/research/2026-09-10-block-1-experimental-corpus.md",
+    "blob_sha": "09d14c87395603e417619c0298580ef6fafb51b2"
+  },
+  "assignment_rule": "Primary family follows requested work in the task statement, not incidental contents of a reference/gold solution. Exactly one primary family is required before admission.",
+  "families": {
+    "F1": {"name": "Localized defect repair", "definition": "Incorrect branch/boundary, localized parsing or serialization error, or small API behavior regression solvable with a small working set."},
+    "F2": {"name": "Cross-file / integration defect repair", "definition": "Defect spanning interfaces, implementations, modules, service/domain/persistence boundaries, or dependency interactions requiring multiple local contexts."},
+    "F3": {"name": "Feature / behavior change", "definition": "Bounded new behavior, domain rule extension, supported input variant, or small capability implemented from specification without subsystem redesign."},
+    "F4": {"name": "Test generation / test completion", "definition": "Add or strengthen regression/property/edge-case coverage to encode an existing behavioral contract."},
+    "F5": {"name": "Refactor / code-quality / review-driven correction", "definition": "Behavior-preserving refactor, concrete review finding, structural cleanup, or deterministic style/static-analysis correction requiring code changes."},
+    "F6": {"name": "Configuration / build / dependency / repository integration", "definition": "Build/configuration/dependency/CI/repository wiring work where environment and tooling are central."}
+  },
+  "performance_based_assignment": false,
+  "treatment_execution": "NOT_EXECUTED",
+  "holdout_access": "NONE"
+}
