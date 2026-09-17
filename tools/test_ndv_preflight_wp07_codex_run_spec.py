@@ -16,7 +16,12 @@ class PreflightTests(unittest.TestCase):
         (d/"evidence"/"executor.log").write_text("model: gpt-5.6-luna\n"); (d/"evidence"/"candidate.diff").write_bytes(b"diff\n"); (d/"evidence"/"git-status.txt").write_text(" M TARGET.txt\n"); seal_bundle(d)
         rec={"binding_id":"B-LUNA","binding_ref":str(bp),"binding_file_sha256":mod.sha_file(bp),"qualification_ref":str(qp),"qualification_file_sha256":mod.sha_file(qp),"evidence_manifest_ref":str(d/"evidence-manifest.json"),"evidence_manifest_sha256":mod.sha_file(d/"evidence-manifest.json"),"execution_surface_ref":str(surface),"execution_surface_file_sha256":sh,"exact_executor_identity":b["exact_executor_identity"],"surface_class":"SUBSCRIPTION_EXECUTOR_PINNED"}
         budgets=root/"budgets.json"; budgets.write_text(json.dumps({"schema_id":"ndv-p1-wp07-execution-budgets-v1","status":"PROSPECTIVE_FROZEN_NOT_EXECUTED","executor_timeout_ms_per_hop":1800000,"treatments":{x:{"run_timeout_ms":7200000 if x in {"B2","B4"} else 5400000,"retry_limit":0,"escalation_limit":1 if x in {"B2","B4"} else 0} for x in ["B0","B1","B2","B3","B4"]},"treatment_results_consulted":False,"task_exposure":False,"treatment_execution":"NOT_EXECUTED","holdout_access":"NONE"}))
-        treatment={"id":treatment_id,"bindings":{"PRIMARY_ECONOMIC":rec} if treatment_id!="B4" else {"PRIMARY_LOCAL_OR_FREE":{"surface_class":"LOCAL_PINNED"},"ESCALATION_STRONG":rec}}
+        if treatment_id=="B2":
+            treatment={"id":"B2","bindings":{"PRIMARY_ECONOMIC":dict(rec),"ESCALATION_STRONG":dict(rec)}}
+        elif treatment_id=="B4":
+            treatment={"id":"B4","bindings":{"PRIMARY_LOCAL_OR_FREE":{"surface_class":"LOCAL_PINNED"},"ESCALATION_STRONG":rec}}
+        else:
+            treatment={"id":treatment_id,"bindings":{"PRIMARY_ECONOMIC":rec}}
         spec=root/"spec.json"; spec.write_text(json.dumps({"schema_id":"ndv-p1-s2-run-spec-v1","run_id":"R1","execution_status":"NOT_EXECUTED","holdout":"DEVELOPMENT_ONLY","treatment":treatment,"budgets":{"executor_timeout_ms":1800000,"run_timeout_ms":7200000 if treatment_id in {"B2","B4"} else 5400000,"retry_limit":0,"escalation_limit":1 if treatment_id in {"B2","B4"} else 0,"budget_contract_ref":str(budgets),"budget_contract_file_sha256":mod.sha_file(budgets)}}))
         return spec,surface,budgets
     @mock.patch.object(mod.subprocess,"run")
@@ -34,6 +39,29 @@ class PreflightTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root=Path(tmp); spec,_,_=self.make_fixture(root,"B2")
             with self.assertRaisesRegex(ValueError,"cascade treatment requires explicit per-hop preflight"): mod.preflight(spec,root)
+    @mock.patch.object(mod.subprocess,"run")
+    def test_b2_primary_and_escalation_hops_are_explicitly_preflighted(self,run_mock):
+        run_mock.side_effect=[
+            subprocess.CompletedProcess([],0,stdout="codex-cli 0.153.0\n",stderr=""),
+            subprocess.CompletedProcess([],0,stdout="--model --sandbox --json --ephemeral --ignore-user-config --ignore-rules --strict-config --disable\n",stderr=""),
+            subprocess.CompletedProcess([],0,stdout="codex-cli 0.153.0\n",stderr=""),
+            subprocess.CompletedProcess([],0,stdout="--model --sandbox --json --ephemeral --ignore-user-config --ignore-rules --strict-config --disable\n",stderr=""),
+        ]
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp); spec,_,_=self.make_fixture(root,"B2")
+            primary=mod.preflight_hop(spec,root,"PRIMARY_ECONOMIC")
+            strong=mod.preflight_hop(spec,root,"ESCALATION_STRONG")
+            self.assertEqual(primary["hop_role"],"PRIMARY_ECONOMIC")
+            self.assertEqual(strong["hop_role"],"ESCALATION_STRONG")
+            self.assertEqual(primary["escalation_limit"],1)
+            self.assertEqual(strong["escalation_limit"],1)
+            self.assertFalse(primary["task_prompt_exposed"])
+            self.assertFalse(strong["task_prompt_exposed"])
+            self.assertEqual(run_mock.call_count,4)
+    def test_b2_unknown_hop_role_blocks_before_codex(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp); spec,_,_=self.make_fixture(root,"B2")
+            with self.assertRaisesRegex(ValueError,"frozen hop role not found"): mod.preflight_hop(spec,root,"UNFROZEN_ROLE")
     def test_b4_local_plus_codex_escalation_is_still_rejected_as_cascade(self):
         with tempfile.TemporaryDirectory() as tmp:
             root=Path(tmp); spec,_,_=self.make_fixture(root,"B4")
