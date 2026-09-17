@@ -7,7 +7,7 @@ import ndv_import_wp04_binding as mod
 
 
 class BindingImportTests(unittest.TestCase):
-    def binding(self):
+    def binding(self, qualification_sha="b" * 64):
         return {
             "schema_id": "ndv-p1-wp04-executor-binding-v2",
             "binding_id": "B1",
@@ -18,7 +18,7 @@ class BindingImportTests(unittest.TestCase):
             "version_or_model_hash": "aider:aider 0.86.2|ollama:" + "a" * 64,
             "invocation_command_or_surface": "aider --model ollama_chat/qwen2.5-coder:3b --message <RAW_TASK>",
             "qualification_evidence_ref": "qualification.json",
-            "qualification_evidence_sha256": "b" * 64,
+            "qualification_evidence_sha256": qualification_sha,
             "candidate_capture_mode": "ISOLATED_WORKTREE_GIT_DIFF",
             "network_policy": "LOCAL_OLLAMA_REQUIRED",
             "frozen_at": "2026-09-16T00:00:00Z",
@@ -59,6 +59,24 @@ class BindingImportTests(unittest.TestCase):
         b = self.binding(); b["dynamic_routing"] = True
         with self.assertRaisesRegex(ValueError, "contract invalid"):
             mod.validate_original(b, self.report())
+
+    def test_qualification_bytes_must_match_binding_hash(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            p = Path(tmp) / "qualification.json"
+            p.write_text(json.dumps({"status": "S0_READY"}))
+            b = self.binding(mod.sha256_file(p))
+            mod.validate_qualification_bytes(b, p)
+            b["qualification_evidence_sha256"] = "0" * 64
+            with self.assertRaisesRegex(ValueError, "SHA-256"):
+                mod.validate_qualification_bytes(b, p)
+
+    def test_qualification_must_be_ready(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            p = Path(tmp) / "qualification.json"
+            p.write_text(json.dumps({"status": "S0_FAIL"}))
+            b = self.binding(mod.sha256_file(p))
+            with self.assertRaisesRegex(ValueError, "not a ready"):
+                mod.validate_qualification_bytes(b, p)
 
 
 if __name__ == "__main__": unittest.main()
