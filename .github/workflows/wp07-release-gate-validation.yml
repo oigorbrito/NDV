@@ -3,11 +3,17 @@ name: WP-07 Release Gate Validation
 on:
   push:
     paths:
+      - 'experiments/p1/wp07-development-comparison-protocol-v1.json'
+      - 'tools/ndv_validate_wp07_protocol.py'
+      - 'tools/test_ndv_validate_wp07_protocol.py'
       - 'tools/ndv_release_wp07_development_comparison.py'
       - 'tools/test_ndv_release_wp07_development_comparison.py'
       - '.github/workflows/wp07-release-gate-validation.yml'
   pull_request:
     paths:
+      - 'experiments/p1/wp07-development-comparison-protocol-v1.json'
+      - 'tools/ndv_validate_wp07_protocol.py'
+      - 'tools/test_ndv_validate_wp07_protocol.py'
       - 'tools/ndv_release_wp07_development_comparison.py'
       - 'tools/test_ndv_release_wp07_development_comparison.py'
       - '.github/workflows/wp07-release-gate-validation.yml'
@@ -24,8 +30,14 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.13'
-      - name: Compile release gate
-        run: python -m py_compile tools/ndv_release_wp07_development_comparison.py
-      - name: Test release gate
+      - name: Compile WP-07 gates
+        run: |
+          python -m py_compile tools/ndv_validate_wp07_protocol.py
+          python -m py_compile tools/ndv_release_wp07_development_comparison.py
+      - name: Validate frozen comparison protocol
+        run: python tools/ndv_validate_wp07_protocol.py experiments/p1/wp07-development-comparison-protocol-v1.json
+      - name: Test WP-07 gates
         working-directory: tools
-        run: python -m unittest -v test_ndv_release_wp07_development_comparison.py
+        run: |
+          python -m unittest -v test_ndv_validate_wp07_protocol.py
+          python -m unittest -v test_ndv_release_wp07_development_comparison.py
