@@ -11,6 +11,16 @@
     "classification": "GOLD_PATCH_EVALUATOR_NOT_BASE_VERIFIER",
     "reason": "Ordinary upstream evaluation applies patch and test_patch before test commands, so NDV requires an independent pre-solution base audit."
   },
+  "instance_image_layout": {
+    "repository": "SWE-rebench/SWE-rebench-V2",
+    "revision": "c71902a8cf8d2b725f63d51f199f4d3e56f68d2d",
+    "path": "combine.Dockerfile.j2",
+    "git_blob_sha": "b87c412bab0906e054f3c49f653a9b792e4ab7f6",
+    "project_dir_rule": "/<repo-name>",
+    "template_expression": "project_dir = /{spec.repo.split('/')[1]}",
+    "workdir_rule": "WORKDIR project_dir",
+    "runner_binding": "tools/ndv_run_s2_base_audit.py derives /<repo-name> from candidate.repository; changes require a new audited contract revision"
+  },
   "source_binding": {
     "required": ["dataset_revision", "source_row_index", "source_instance_id", "ndv_canonical_row_sha256"],
     "rule": "Admission evidence must remain bound to the exact quarantined upstream row and original Parquet row index."
@@ -18,7 +28,7 @@
   "base_runner": {
     "ndv_tool": "tools/ndv_run_s2_base_audit.py",
     "schema": "ndv-p1-s2-base-audit-run-v2",
-    "required_integrity": ["exact base HEAD", "clean worktree before tests", "all command return-code markers present", "immutable image RepoDigest", "network none"],
+    "required_integrity": ["exact base HEAD", "clean worktree before tests", "all command return-code markers present", "immutable image RepoDigest matching frozen image repository", "network none"],
     "gold_patch_application": "FORBIDDEN",
     "test_patch_application": "FORBIDDEN",
     "audit_pass_requires": "harness_integrity=PASS"
