@@ -1,0 +1,130 @@
+{
+  "schema_id": "ndv-p1-wp07-executor-role-qualification-v1",
+  "status": "PROSPECTIVE_FROZEN_NOT_EXECUTED",
+  "purpose": "Qualify concrete executor surfaces for WP-07 treatment roles without exposing development-corpus tasks or changing treatment definitions.",
+  "created_at": "2026-09-17",
+  "evidence_boundary": {
+    "qualification_is_not_comparative_evidence": true,
+    "synthetic_mutation_only": true,
+    "development_task_exposure": false,
+    "holdout_access": "NONE",
+    "no_post_hoc_role_switching": true,
+    "no_dynamic_provider_routing": true,
+    "no_implicit_model_fallback": true,
+    "no_unplanned_retry": true
+  },
+  "role_contracts": {
+    "PRIMARY_STRONG": {
+      "purpose": "B0 direct baseline and strong escalation target",
+      "required_surface_class": ["STRONG_REMOTE_PINNED", "SUBSCRIPTION_EXECUTOR_PINNED"],
+      "must_be_repository_capable": true,
+      "exact_model_identity_required": true,
+      "candidate_quality_claim": "ROLE_ELIGIBILITY_ONLY"
+    },
+    "PRIMARY_ECONOMIC": {
+      "purpose": "B1 direct economic baseline and B2 first hop",
+      "required_surface_class": ["ECONOMIC_REMOTE_PINNED", "SUBSCRIPTION_EXECUTOR_PINNED"],
+      "must_be_repository_capable": true,
+      "exact_model_identity_required": true,
+      "candidate_quality_claim": "ROLE_ELIGIBILITY_ONLY"
+    },
+    "ESCALATION_STRONG": {
+      "purpose": "B2/B4 deterministic escalation target",
+      "required_surface_class": ["STRONG_REMOTE_PINNED", "SUBSCRIPTION_EXECUTOR_PINNED"],
+      "must_be_repository_capable": true,
+      "exact_model_identity_required": true,
+      "candidate_quality_claim": "ROLE_ELIGIBILITY_ONLY"
+    }
+  },
+  "candidate_program": [
+    {
+      "candidate_id": "CODEX-PLUS-GPT-5.6-SOL",
+      "provider": "OpenAI",
+      "surface": "Codex CLI authenticated with ChatGPT plan",
+      "expected_cli": "codex",
+      "expected_model": "gpt-5.6-sol",
+      "candidate_roles": ["PRIMARY_STRONG", "ESCALATION_STRONG"],
+      "surface_class_if_qualified": "SUBSCRIPTION_EXECUTOR_PINNED",
+      "status": "DISCOVERED_NOT_QUALIFIED",
+      "rationale": "Paid-plan Codex model positioned for higher-capability coding/work; role assignment remains operational and creates no comparative quality claim."
+    },
+    {
+      "candidate_id": "CODEX-PLUS-GPT-5.6-LUNA",
+      "provider": "OpenAI",
+      "surface": "Codex CLI authenticated with ChatGPT plan",
+      "expected_cli": "codex",
+      "expected_model": "gpt-5.6-luna",
+      "candidate_roles": ["PRIMARY_ECONOMIC"],
+      "surface_class_if_qualified": "SUBSCRIPTION_EXECUTOR_PINNED",
+      "status": "DISCOVERED_NOT_QUALIFIED",
+      "rationale": "Lowest-cost GPT-5.6 Codex option in current published pricing; no performance superiority is assumed."
+    },
+    {
+      "candidate_id": "CODEX-PLUS-GPT-5.6-TERRA",
+      "provider": "OpenAI",
+      "surface": "Codex CLI authenticated with ChatGPT plan",
+      "expected_cli": "codex",
+      "expected_model": "gpt-5.6-terra",
+      "candidate_roles": ["PRIMARY_ECONOMIC", "FAMILY_POLICY_CANDIDATE"],
+      "surface_class_if_qualified": "SUBSCRIPTION_EXECUTOR_PINNED",
+      "status": "DISCOVERED_NOT_QUALIFIED",
+      "rationale": "Intermediate capability/cost candidate; kept optional so B1 is not silently redefined after observation."
+    },
+    {
+      "candidate_id": "GOOGLE-AI-PRO-ANTIGRAVITY",
+      "provider": "Google",
+      "surface": "Antigravity CLI authenticated with Google AI Pro",
+      "expected_cli": "agy",
+      "expected_model": "DISCOVER_AND_PIN_OR_REJECT",
+      "candidate_roles": ["EXPLORATION_ONLY"],
+      "surface_class_if_qualified": "SUBSCRIPTION_EXECUTOR_PINNED",
+      "status": "DISCOVERED_INTERFACE_IDENTITY_UNRESOLVED",
+      "rationale": "Individual Google AI Pro terminal access migrated from Gemini CLI to Antigravity CLI; no WP-07 role is permitted unless an exact model and noninteractive repository-mutation surface can be pinned and observed."
+    }
+  ],
+  "qualification_sequence": [
+    "DISCOVER_EXECUTABLE_AND_VERSION",
+    "DISCOVER_NONINTERACTIVE_INTERFACE",
+    "PROVE_EXACT_MODEL_SELECTION",
+    "PROVE_NO_DYNAMIC_FALLBACK",
+    "PROVE_SYNTHETIC_REPOSITORY_MUTATION",
+    "CAPTURE_DIFF_AND_EXIT_STATUS",
+    "CAPTURE_USAGE_OR_EXPLICIT_MISSINGNESS",
+    "CAPTURE_SUBSCRIPTION_OR_PRICING_PROVENANCE_WITHOUT_SECRETS",
+    "FREEZE_BINDING_BYTES",
+    "FREEZE_QUALIFICATION_EVIDENCE_BYTES"
+  ],
+  "synthetic_mutation_contract": {
+    "repository": "fresh temporary git repository",
+    "initial_file": "TARGET.txt",
+    "initial_content": "BEFORE\n",
+    "task": "Change TARGET.txt so its complete contents are exactly AFTER followed by one newline. Do not create or modify any other tracked file.",
+    "success_requires": [
+      "executor_returncode_zero",
+      "TARGET.txt_exactly_AFTER_newline",
+      "git_diff_contains_only_TARGET.txt",
+      "exact_requested_model_observed",
+      "no_fallback_observed"
+    ],
+    "retry_limit": 0,
+    "escalation_limit": 0,
+    "development_task_exposure": false
+  },
+  "published_source_snapshot": {
+    "retrieved_at": "2026-09-17",
+    "openai_codex_plan": "https://help.openai.com/en/articles/11369540",
+    "openai_gpt56_availability": "https://help.openai.com/en/articles/20001354-gpt-5-6",
+    "openai_codex_pricing_reference": "https://help.openai.com/en/articles/20001415",
+    "openai_codex_repository_exec": "https://github.com/openai/codex",
+    "google_antigravity_transition": "https://github.com/google-gemini/gemini-cli/discussions/27274",
+    "google_antigravity_cli": "https://github.com/google-antigravity/antigravity-cli"
+  },
+  "promotion_rules": {
+    "CODEX-PLUS-GPT-5.6-SOL": ["B0.PRIMARY_STRONG", "B2.ESCALATION_STRONG", "B4.ESCALATION_STRONG"],
+    "CODEX-PLUS-GPT-5.6-LUNA": ["B1.PRIMARY_ECONOMIC", "B2.PRIMARY_ECONOMIC"],
+    "CODEX-PLUS-GPT-5.6-TERRA": ["NO_AUTOMATIC_PROMOTION"],
+    "GOOGLE-AI-PRO-ANTIGRAVITY": ["NO_AUTOMATIC_PROMOTION"]
+  },
+  "treatment_execution": "NOT_EXECUTED",
+  "holdout_access": "NONE"
+}
