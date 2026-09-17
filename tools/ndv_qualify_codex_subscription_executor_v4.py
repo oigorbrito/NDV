@@ -131,7 +131,7 @@ def qualify(codex: Path, model: str, out_dir: Path, program_path: Path, timeout:
             "api_key_routing_forbidden":True,"dynamic_routing":False,"implicit_fallback":False,"retry_limit":0,"escalation_limit":0,
             "qualification_ref":"qualification.json","qualification_file_sha256":sha_file(qpath),"program_ref":str(program_path),"program_file_sha256":sha_file(program_path),
             "execution_surface_ref":str(surface_path),"execution_surface_file_sha256":sha_file(surface_path),"amendment_ref":str(amendment_path),"amendment_file_sha256":sha_file(amendment_path),
-            "writable_root_policy":"EXACT_WORKSPACE_VIA_ADD_DIR","windows_sandbox_backend":"UN ELEVATED".replace(" ", ""),
+            "writable_root_policy":"EXACT_WORKSPACE_VIA_ADD_DIR","windows_sandbox_backend":"UNELEVATED",
             "candidate_roles":roles,"treatment_execution":"NOT_EXECUTED","holdout_access":"NONE"
         }
         (out_dir/"executor-binding.json").write_text(json.dumps(binding, indent=2, sort_keys=True)+"\n", encoding="utf-8")
