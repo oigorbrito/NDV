@@ -14,8 +14,16 @@ REQUIRED_ARTIFACTS = (
     "evidence/candidate.diff",
     "evidence/git-status.txt",
 )
-QUALIFICATION_SCHEMAS={"ndv-p1-wp07-codex-subscription-qualification-v1","ndv-p1-wp07-codex-subscription-qualification-v2"}
-BINDING_SCHEMAS={"ndv-p1-wp07-executor-binding-v1","ndv-p1-wp07-executor-binding-v2"}
+QUALIFICATION_SCHEMAS={
+    "ndv-p1-wp07-codex-subscription-qualification-v1",
+    "ndv-p1-wp07-codex-subscription-qualification-v2",
+    "ndv-p1-wp07-codex-subscription-qualification-v3",
+}
+BINDING_SCHEMAS={
+    "ndv-p1-wp07-executor-binding-v1",
+    "ndv-p1-wp07-executor-binding-v2",
+    "ndv-p1-wp07-executor-binding-v3",
+}
 
 
 def sha_file(path: Path) -> str:
