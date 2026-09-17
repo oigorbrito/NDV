@@ -1,0 +1,13 @@
+{
+  "schema_id":"p1-run-spec-v1",
+  "run_id":"UNIQUE_REQUIRED",
+  "phase":"P1-S1|P1-S2|P1-S3|P1-S4",
+  "task":{"task_id":"REQUIRED","family":"F1-F6","repository":"REQUIRED","base_sha":"40_HEX","task_statement_sha256":"REQUIRED","verifier_ref":"VERSIONED_REQUIRED","solution_isolation":"SOLUTION_NOT_AVAILABLE_TO_EXECUTOR"},
+  "treatment":{"id":"B0|B1|B2|B3|B4","executor_binding":"FROZEN_REQUIRED","shaping":"S0_RAW_TASK|S1_DETERMINISTIC_TASK_SHAPING","rollout":"REQUIRED","repetition":"REQUIRED"},
+  "environment":{"cwd":"REQUIRED","os":"REQUIRED","toolchain":"REQUIRED","dependency_lock":"REQUIRED","network_policy":"REQUIRED","cache_state":"REQUIRED","warm_cold_state":"REQUIRED","environment_variables":"NO_SECRETS"},
+  "budgets":{"executor_timeout_ms":"FROZEN_REQUIRED","run_timeout_ms":"FROZEN_REQUIRED","retry_limit":"FROZEN_REQUIRED","escalation_limit":"FROZEN_REQUIRED","tool_invocation_limit":"OPTIONAL","monetary_ceiling":"OPTIONAL"},
+  "telemetry_requirements":["identity","timestamps","candidate_artifact","usage or explicit missingness","retry/escalation events","authoritative usage reference"],
+  "oracle":{"focal":"REQUIRED","preservation":"REQUIRED","failure_attribution_ref":"experiments/p1/failure-attribution-v1.json"},
+  "accounting_ref":"experiments/p1/run-accounting-contract-v1.json",
+  "holdout":"MUST_BE_EXPLICITLY_SEALED_OR_DEVELOPMENT"
+}
