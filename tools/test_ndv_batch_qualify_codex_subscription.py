@@ -1,3 +1,4 @@
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -47,6 +48,35 @@ class BatchQualificationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             with self.assertRaisesRegex(ValueError,"version drift"):
                 mod.batch(Path("codex.exe"),Path(tmp)/"batch",Path("program.json"),600)
+
+    def probe_fixture(self, root: Path):
+        exe=root/"codex.exe"; exe.write_bytes(b"x")
+        program=root/"program.json"; program.write_text("{}")
+        probe=root/"probe.json"
+        probe.write_text(json.dumps({
+            "schema_id":mod.PROBE_SCHEMA,"status":"DISCOVERY_COMPLETE","program_file_sha256":mod.sha_file(program),
+            "surfaces":{"codex":{"status":"DISCOVERED","executable_path":str(exe),"noninteractive_exec_discovered":True,"model_flag_discovered":True,"sandbox_flag_discovered":True}},
+            "task_exposure":False,"treatment_execution":"NOT_EXECUTED","holdout_access":"NONE"
+        }))
+        return exe,program,probe
+
+    def test_resolves_codex_from_valid_probe(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);exe,program,probe=self.probe_fixture(root)
+            observed,binding=mod.resolve_codex_exe(codex_exe=None,probe=probe,program=program)
+            self.assertEqual(observed,exe.resolve());self.assertEqual(binding["probe_file_sha256"],mod.sha_file(probe))
+
+    def test_probe_program_hash_mismatch_blocks(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);_,program,probe=self.probe_fixture(root);program.write_text('{"changed":true}')
+            with self.assertRaisesRegex(ValueError,"program hash mismatch"):
+                mod.resolve_codex_exe(codex_exe=None,probe=probe,program=program)
+
+    def test_probe_missing_executable_blocks(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);exe,program,probe=self.probe_fixture(root);exe.unlink()
+            with self.assertRaisesRegex(ValueError,"no longer present"):
+                mod.resolve_codex_exe(codex_exe=None,probe=probe,program=program)
 
 
 if __name__=="__main__": unittest.main()
