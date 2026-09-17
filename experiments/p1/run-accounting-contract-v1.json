@@ -1,0 +1,14 @@
+{
+  "contract_id":"p1-run-accounting-v1",
+  "unit":"TREATMENT_RUN = frozen task x frozen treatment x frozen executor binding x frozen shaping x rollout/repetition",
+  "primary":"TOTAL_SYSTEM_TOKENS / VERIFIED_SOLVED_TASK",
+  "partitions":["routing","task_shaping","planning","context_input","execution","escalation_handoff","verification","retry_replanning"],
+  "other_metrics":["TOTAL_MONETARY_COST / VERIFIED_SOLVED_TASK","WALL_CLOCK_LATENCY","solve rate","escalation rate","retry rate","verifier cost","failure rate","inconclusive rate"],
+  "failure_cost_rule":"all consumed resources remain accounted for on failure or inconclusive",
+  "remote_required":["provider","exact model","request parameters","pricing source/date","price schedule identity","input tokens","cached input tokens","output tokens","reasoning tokens where exposed","API usage identifiers"],
+  "local_required":["hardware identity","runtime/model hash","quantization","warm/cold state","load time","wall time","token telemetry","energy evidence when reliable"],
+  "free_local_rule":"FREE != ZERO COST; keep hardware, energy, setup, maintenance, verification and escalation separate; no hardware-to-token conversion",
+  "cache_rule":"record cache availability, creation, amortization and matched cache state; cache benefit is not free",
+  "price_drift_rule":"retain historical source/date; future-price normalization is separate analysis",
+  "no_composite_score":true
+}
