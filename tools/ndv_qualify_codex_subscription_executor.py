@@ -70,7 +70,7 @@ def require_interface(codex:Path)->tuple[str,set[str]]:
     if parsed < (0,144,0): raise ValueError(f"Codex >=0.144.0 required for GPT-5.6; observed {parsed}")
     help_p=run([str(codex),"exec","--help"],timeout=30); help_text=text(help_p)
     if help_p.returncode!=0: raise ValueError("codex exec --help failed")
-    required={"--model","--sandbox","--json","--ephemeral","--ignore-user-config","--ignore-rules","--strict-config"}
+    required={"--model","--sandbox","--json","--ephemeral","--ignore-user-config","--ignore-rules","--strict-config","--disable"}
     missing={flag for flag in required if flag not in help_text}
     if missing: raise ValueError(f"Codex exec interface missing required fail-closed flags: {sorted(missing)}")
     return raw.strip(), required
