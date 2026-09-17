@@ -18,11 +18,13 @@ QUALIFICATION_SCHEMAS={
     "ndv-p1-wp07-codex-subscription-qualification-v1",
     "ndv-p1-wp07-codex-subscription-qualification-v2",
     "ndv-p1-wp07-codex-subscription-qualification-v3",
+    "ndv-p1-wp07-codex-subscription-qualification-v4",
 }
 BINDING_SCHEMAS={
     "ndv-p1-wp07-executor-binding-v1",
     "ndv-p1-wp07-executor-binding-v2",
     "ndv-p1-wp07-executor-binding-v3",
+    "ndv-p1-wp07-executor-binding-v4",
 }
 
 
