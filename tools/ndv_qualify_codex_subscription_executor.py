@@ -20,6 +20,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from ndv_wp07_codex_bundle import seal_bundle
+
 PROGRAM = Path("experiments/p1/wp07-executor-role-qualification-v1.json")
 ALLOWED = {
     "gpt-5.6-sol": ("CODEX-PLUS-GPT-5.6-SOL", ["PRIMARY_STRONG", "ESCALATION_STRONG"]),
@@ -117,16 +119,17 @@ def qualify(codex:Path,model:str,out_dir:Path,program_path:Path,timeout:int)->di
         "schema_id":"ndv-p1-wp07-codex-subscription-qualification-v1","status":state,"candidate_id":candidate_id,"requested_model":model,"observed_models":sorted(models),"exact_model_observed":observed_exact,"candidate_roles":roles,"surface_class":"SUBSCRIPTION_EXECUTOR_PINNED","codex_executable":str(codex.resolve()),"codex_version_raw":version_raw,"auth_path":"CHATGPT_SUBSCRIPTION_FORCED_BY_REMOVING_API_KEY_ENV","api_key_env_removed":True,"task":"SYNTHETIC_MUTATION_ONLY","task_exposure":False,"development_task_exposure":False,"holdout_access":"NONE","retry_count":0,"escalation_count":0,"executor":{"returncode":proc.returncode,"timed_out":timed_out,"wall_seconds":wall},"mutation":{"exact":exact,"candidate_diff_sha256":sha_bytes(diff),"candidate_diff_bytes":len(diff)},"program_ref":str(program_path.resolve()),"program_file_sha256":sha_file(program_path.resolve()),"started_at":started,"completed_at":datetime.now(timezone.utc).isoformat(),"treatment_execution":"NOT_EXECUTED"
     }
     qpath=out_dir/"qualification.json"; qpath.write_text(json.dumps(qualification,indent=2,sort_keys=True)+"\n",encoding="utf-8")
-    binding=None
+    binding=None; manifest=None
     if state=="S0_READY":
         seed=json.dumps({"candidate":candidate_id,"model":model,"codex":version_raw,"qualification":sha_file(qpath)},sort_keys=True).encode()
         binding={"schema_id":"ndv-p1-wp07-executor-binding-v1","status":"QUALIFIED","binding_id":"WP07-CODEX-"+hashlib.sha256(seed).hexdigest()[:16],"candidate_id":candidate_id,"provider":"OpenAI","surface_class":"SUBSCRIPTION_EXECUTOR_PINNED","exact_executor_identity":f"codex({version_raw})+{model}","scaffold":{"name":"codex","version":version_raw,"executable_path":str(codex.resolve()),"invocation_mode":"exec noninteractive synthetic-qualified"},"model":{"identity":model,"selection":"EXPLICIT_PINNED"},"auth_path":"CHATGPT_SUBSCRIPTION","api_key_routing_forbidden":True,"dynamic_routing":False,"implicit_fallback":False,"retry_limit":0,"escalation_limit":0,"qualification_ref":"qualification.json","qualification_file_sha256":sha_file(qpath),"program_ref":str(program_path.resolve()),"program_file_sha256":sha_file(program_path.resolve()),"candidate_roles":roles,"treatment_execution":"NOT_EXECUTED","holdout_access":"NONE"}
         (out_dir/"executor-binding.json").write_text(json.dumps(binding,indent=2,sort_keys=True)+"\n",encoding="utf-8")
-    return {"qualification":qualification,"binding":binding}
+        manifest=seal_bundle(out_dir)
+    return {"qualification":qualification,"binding":binding,"manifest":manifest}
 
 def main()->int:
     ap=argparse.ArgumentParser(description=__doc__); ap.add_argument("--codex-exe",required=True,type=Path); ap.add_argument("--model",required=True,choices=sorted(ALLOWED)); ap.add_argument("--out-dir",required=True,type=Path); ap.add_argument("--program",type=Path,default=PROGRAM); ap.add_argument("--timeout",type=int,default=600); args=ap.parse_args()
     try: result=qualify(args.codex_exe,args.model,args.out_dir,args.program,args.timeout)
     except (OSError,ValueError,json.JSONDecodeError) as exc: print(json.dumps({"status":"FAIL","reason":"CODEX_SUBSCRIPTION_QUALIFICATION_BLOCKED","detail":str(exc)},indent=2)); return 2
-    q=result["qualification"]; print(json.dumps({"status":q["status"],"candidate_id":q["candidate_id"],"model":q["requested_model"],"binding":str(args.out_dir/"executor-binding.json") if result["binding"] else None},indent=2)); return 0 if q["status"]=="S0_READY" else 2
+    q=result["qualification"]; print(json.dumps({"status":q["status"],"candidate_id":q["candidate_id"],"model":q["requested_model"],"binding":str(args.out_dir/"executor-binding.json") if result["binding"] else None,"evidence_manifest":str(args.out_dir/"evidence-manifest.json") if result["manifest"] else None},indent=2)); return 0 if q["status"]=="S0_READY" else 2
 if __name__=="__main__": raise SystemExit(main())
