@@ -67,17 +67,20 @@ If approved, the adapter must:
 
 ## Donor-first evaluation order
 
-The immediate candidate set identified for audit includes:
+The primary donor gates are ordered:
 
 1. **AOrchestra** — primary candidate for runtime composition/orchestration reuse.
 2. **MaAS** — candidate for automated agent-architecture search/adaptation and cost-aware selection.
 3. **AgentSquare** — candidate for modular composition of agent capabilities.
 4. **SkillOrchestra** — candidate for reusable skill/capability orchestration.
-5. **ClawArena / ClawArena-Team** — candidate benchmark/harness for dynamic coordination and multi-agent orchestration.
-6. **TwinRouterBench / Agent-as-a-Router** — candidate routing and cost/capability evaluation infrastructure.
-7. **OpenHands / SWE-bench / TerminalBench** — candidate software-engineering execution and verification harnesses.
+5. **ClawArena / ClawArena-Team** — benchmark/harness candidate after the reusable runtime/composition donors have been exhausted.
 
-This list is a research queue, not an integration mandate. A donor should be added to NDV only if it satisfies a required contract more economically than alternatives.
+Secondary infrastructure and evidence sources include:
+
+- **TwinRouterBench / Agent-as-a-Router** — routing and cost/capability evaluation infrastructure.
+- **OpenHands / SWE-bench / TerminalBench** — software-engineering execution and verification infrastructure.
+
+This is a gated research queue, not an integration mandate. Do not audit the next donor merely because it is listed. Advance only when the current donor leaves a contract-relevant gap. If a donor closes the gap, stop for that contract.
 
 Before a donor is treated as an NDV dependency, record its canonical repository, license, pinned commit or release, execution instructions, and the exact capability being reused.
 
@@ -95,6 +98,15 @@ For each candidate, answer from source code and execution evidence rather than R
 8. Which NDV contracts are already fully satisfied?
 9. Which gaps remain after using the donor as intended?
 10. Can each remaining gap be solved by configuration or an existing extension point before any adapter is considered?
+
+Operational execution of this protocol is governed by `docs/research/UPSTREAM-AUDIT-HARNESS.md`. That harness separates documentation claims, code-confirmed behavior, entry-point qualification, runtime confirmation, and execution-blocked conclusions; it also defines explicit no-repair and stop rules so donor auditing does not drift into donor maintenance.
+
+The audit must distinguish two independent axes:
+
+- **what can change** — model, prompt/reasoning, tools, memory/state, context, instructions, skills, subagents, topology/workflow, verifier, retries, handoff;
+- **when it can change** — offline, training-time, per dataset, per query, per episode, per rollout, per subtask, between delegations, per step, per tool call, or during an already-active executor.
+
+A donor that can generate different architectures per query does not thereby demonstrate recomposition during an active trajectory.
 
 ## Reuse decision record
 
@@ -149,10 +161,14 @@ Only case 2 can justify moving from Phase A to the minimal-adapter exception.
 
 A move beyond minimal adapters requires a separate architecture decision supported by experimental evidence.
 
-## Immediate next action
+## Current audit state and immediate next action
 
-Start with AOrchestra.
+AOrchestra has been execution-confirmed for dynamic delegation and fresh subagent creation. MaAS has been code-confirmed for query-conditioned architecture selection, while its pinned revision presents upstream reproducibility blockers for a bounded HumanEval run (including missing external dataset assets, checkpoint/loader mismatch, and subset support not exposed by the CLI path).
 
-Do not write NDV runtime code before the audit.
+The unresolved contract remains:
 
-The first deliverable is a code-level map of what AOrchestra already provides, what can be reused unchanged, and what — if anything — remains missing after upstream execution.
+> Can an upstream donor recompose relevant capabilities during an already-active execution trajectory based on intermediate state, rather than only between delegations or before query execution?
+
+Proceed to **AgentSquare** using `docs/research/UPSTREAM-AUDIT-HARNESS.md`.
+
+Do not repair AOrchestra or MaAS, and do not write NDV runtime code, merely to strengthen evidence beyond what the current gate requires.
