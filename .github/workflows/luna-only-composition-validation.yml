@@ -8,6 +8,7 @@ on:
       - 'docs/research/EXPERIMENTAL-PROGRAM.md'
       - 'tools/ndv_validate_luna_only_composition_contracts.py'
       - 'tools/ndv_compile_luna_composition_prompt.py'
+      - 'tools/ndv_qualify_luna_composition_planner.py'
       - 'tools/test_ndv_luna_only_composition.py'
       - '.github/workflows/luna-only-composition-validation.yml'
   pull_request:
@@ -36,6 +37,7 @@ jobs:
         run: |
           python -m py_compile tools/ndv_validate_luna_only_composition_contracts.py
           python -m py_compile tools/ndv_compile_luna_composition_prompt.py
+          python -m py_compile tools/ndv_qualify_luna_composition_planner.py
       - name: Validate contracts
         run: python tools/ndv_validate_luna_only_composition_contracts.py
       - name: Run tests
