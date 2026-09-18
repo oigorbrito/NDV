@@ -1,0 +1,77 @@
+{
+  "schema_id": "ndv-luna-only-composition-prompts-v1",
+  "status": "PROSPECTIVE_FROZEN_NOT_EXECUTED",
+  "common_rules": [
+    "The original frozen task is the authority.",
+    "Do not use or request gold patches, hidden tests, holdout data, or prior treatment results.",
+    "Do not claim success; success is determined by the independent verifier.",
+    "Do not change the model, executor, or invocation surface."
+  ],
+  "D0_executor": {
+    "role": "EXECUTOR",
+    "template": [
+      "Complete the frozen software-engineering task below in the current repository.",
+      "Make only changes needed for the task. Preserve unrelated behavior.",
+      "Do not merely describe a solution: modify the repository.",
+      "",
+      "FROZEN TASK:",
+      "{{TASK}}"
+    ]
+  },
+  "planner": {
+    "role": "PLANNER_NON_MUTATING",
+    "mutation_policy": "ANY_TRACKED_OR_UNTRACKED_WORKSPACE_MUTATION_INVALIDATES_PLAN",
+    "template": [
+      "Inspect the repository as needed, but do not modify, create, delete, or rename any file.",
+      "Produce an operational decomposition for the frozen task.",
+      "Return exactly one JSON object matching schema ndv-luna-decomposition-plan-v1.",
+      "Do not use Markdown fences. Do not include rationale, chain-of-thought, hidden reasoning, confidence, or self-evaluation.",
+      "Use 1 to 8 concrete ordered steps. Dependencies may reference only earlier step ids.",
+      "The plan must not weaken or replace the original task.",
+      "",
+      "TASK ID: {{TASK_ID}}",
+      "FROZEN TASK:",
+      "{{TASK}}"
+    ]
+  },
+  "D1_executor": {
+    "role": "EXECUTOR_WITH_PLAN",
+    "template": [
+      "Complete the frozen software-engineering task below in the current repository.",
+      "The original frozen task is authoritative. The structured plan is an operational aid only.",
+      "Use the plan when useful, but do not broaden scope or violate the task to satisfy the plan.",
+      "Make the repository changes required by the task. Preserve unrelated behavior.",
+      "",
+      "FROZEN TASK:",
+      "{{TASK}}",
+      "",
+      "FROZEN STRUCTURED PLAN:",
+      "{{PLAN_JSON}}"
+    ]
+  },
+  "D2_step_executor": {
+    "role": "STEP_EXECUTOR",
+    "template": [
+      "Work on the frozen software-engineering task in the current evolving candidate workspace.",
+      "The original task is authoritative. Execute the CURRENT STEP and its necessary integration only.",
+      "Preserve valid changes already present from earlier steps. Do not revert them.",
+      "Do not intentionally execute later plan steps unless they are strictly required to make the current step coherent.",
+      "",
+      "FROZEN TASK:",
+      "{{TASK}}",
+      "",
+      "FROZEN STRUCTURED PLAN:",
+      "{{PLAN_JSON}}",
+      "",
+      "CURRENT STEP:",
+      "{{STEP_JSON}}"
+    ]
+  },
+  "template_substitution": {
+    "deterministic": true,
+    "escaping": "VERBATIM_UTF8_JSON_FOR_PLAN_AND_STEP",
+    "llm_rewriting": false
+  },
+  "treatment_execution": "NOT_EXECUTED",
+  "holdout_access": "NONE"
+}
