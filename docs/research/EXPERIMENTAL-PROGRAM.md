@@ -1,5 +1,15 @@
 # NDV Experimental Program
 
+## Active research-path amendment — Luna-only composition
+
+The current active path fixes one qualified executor/model surface: Codex + `gpt-5.6-luna` v4. Multi-model routing is no longer a prerequisite for the current research question.
+
+The earlier P1 multi-model/routing program remains preserved and may be revisited, but it is not on the critical path. The active question is whether explicit decomposition/composition with the same Luna model improves the verified-success / total-cost frontier over direct Luna execution.
+
+This is a controlled scope change, not evidence that composition works. The prospective protocol is `experiments/luna-only/luna-composition-protocol-v1.json` and the research note is `docs/research/LUNA-ONLY-COMPOSITION-TRACK.md`.
+
+Because model selection is held constant, the active track may study composition headroom without first establishing multi-model routing headroom. It still must satisfy corpus, verifier, accounting, and holdout-isolation gates before treatment execution.
+
 ## P1 — Executor and routing economics
 
 Question: which executor/policy treatment minimizes complete system resource cost per verified solved task while preserving success and reproducibility?
