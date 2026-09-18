@@ -1,0 +1,43 @@
+name: Luna-only Composition Validation
+
+on:
+  push:
+    paths:
+      - 'experiments/luna-only/**'
+      - 'docs/research/LUNA-ONLY-COMPOSITION-TRACK.md'
+      - 'docs/research/EXPERIMENTAL-PROGRAM.md'
+      - 'tools/ndv_validate_luna_only_composition_contracts.py'
+      - 'tools/ndv_compile_luna_composition_prompt.py'
+      - 'tools/test_ndv_luna_only_composition.py'
+      - '.github/workflows/luna-only-composition-validation.yml'
+  pull_request:
+    paths:
+      - 'experiments/luna-only/**'
+      - 'docs/research/LUNA-ONLY-COMPOSITION-TRACK.md'
+      - 'docs/research/EXPERIMENTAL-PROGRAM.md'
+      - 'tools/ndv_validate_luna_only_composition_contracts.py'
+      - 'tools/ndv_compile_luna_composition_prompt.py'
+      - 'tools/test_ndv_luna_only_composition.py'
+      - '.github/workflows/luna-only-composition-validation.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Compile tools
+        run: |
+          python -m py_compile tools/ndv_validate_luna_only_composition_contracts.py
+          python -m py_compile tools/ndv_compile_luna_composition_prompt.py
+      - name: Validate contracts
+        run: python tools/ndv_validate_luna_only_composition_contracts.py
+      - name: Run tests
+        working-directory: tools
+        run: python -m unittest -v test_ndv_luna_only_composition.py
