@@ -2,6 +2,7 @@ import json, tempfile, unittest
 from pathlib import Path
 import ndv_compile_luna_composition_prompt as c
 import ndv_validate_luna_only_composition_contracts as v
+import ndv_qualify_luna_composition_planner as pq
 
 class LunaCompositionTests(unittest.TestCase):
     def test_contracts_validate(self):
@@ -29,5 +30,20 @@ class LunaCompositionTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,"fields"): c.validate_plan(p,"T1")
     def test_wrong_task_blocked(self):
         with self.assertRaisesRegex(ValueError,"task_id mismatch"): c.validate_plan(self.plan(),"OTHER")
+    def test_planner_jsonl_extracts_exactly_one_plan(self):
+        p=self.plan()
+        events="\n".join([
+            json.dumps({"type":"thread.started","thread_id":"t"}),
+            json.dumps({"type":"item.completed","item":{"type":"agent_message","text":"inspecting repository"}}),
+            json.dumps({"type":"item.completed","item":{"type":"agent_message","text":json.dumps(p)}}),
+            json.dumps({"type":"turn.completed","usage":{"input_tokens":1,"cached_input_tokens":0,"cache_write_input_tokens":0,"output_tokens":1,"reasoning_output_tokens":0}})
+        ])
+        self.assertEqual(pq.extract_plan(events,"T1")["task_id"],"T1")
+    def test_planner_multiple_valid_plans_blocked(self):
+        p=self.plan(); msg=json.dumps({"type":"item.completed","item":{"type":"agent_message","text":json.dumps(p)}})
+        with self.assertRaisesRegex(ValueError,"exactly one"): pq.extract_plan(msg+"\n"+msg,"T1")
+    def test_planner_markdown_plan_not_accepted(self):
+        p=self.plan(); msg=json.dumps({"type":"item.completed","item":{"type":"agent_message","text":"```json\n"+json.dumps(p)+"\n```"}})
+        with self.assertRaisesRegex(ValueError,"observed 0"): pq.extract_plan(msg,"T1")
 
 if __name__=="__main__": unittest.main()
