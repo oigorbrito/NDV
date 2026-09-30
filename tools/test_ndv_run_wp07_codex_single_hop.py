@@ -122,6 +122,13 @@ class CodexSingleHopRunnerTests(unittest.TestCase):
         self.assertEqual(out["failure_attribution"],"PROVIDER_FAILURE")
         self.assertEqual(out["verified_solved_task"],"INCONCLUSIVE")
 
+    def test_capture_candidate_diff_rejects_invalid_base_sha(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ws = Path(tmp)
+            for bad_sha in ["", "--output=evil.txt", "-v", None]:
+                with self.assertRaisesRegex(ValueError, "invalid base_sha"):
+                    mod.capture_candidate_diff(ws, bad_sha)
+
 
 if __name__=="__main__":
     unittest.main()
