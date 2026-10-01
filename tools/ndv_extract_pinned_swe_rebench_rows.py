@@ -133,6 +133,10 @@ def main() -> int:
         "python_version": sys.version.split()[0], "pyarrow_version": required_pyarrow,
     }
     if args.quarantine_out:
+        # Security: Verify quarantine tool exists and is a regular file before spawning subprocess
+        if not args.quarantine_tool.is_file():
+            print(json.dumps({"status": "FAIL", "reason": "QUARANTINE_TOOL_NOT_FOUND", "path": str(args.quarantine_tool)}, indent=2))
+            return 2
         proc = subprocess.run([sys.executable, str(args.quarantine_tool), "--rows", str(args.out), "--wave", str(args.wave), "--out", str(args.quarantine_out)], text=True, capture_output=True, check=False)
         result["quarantine_exit_code"], result["quarantine_stdout"], result["quarantine_stderr"] = proc.returncode, proc.stdout.strip(), proc.stderr.strip()
         if proc.returncode != 0:
