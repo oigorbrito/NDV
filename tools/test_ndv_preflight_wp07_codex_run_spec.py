@@ -76,5 +76,13 @@ class PreflightTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root=Path(tmp); spec,_,_=self.make_fixture(root); payload=json.loads(spec.read_text()); payload["budgets"]["run_timeout_ms"]+=1; spec.write_text(json.dumps(payload))
             with self.assertRaisesRegex(ValueError,"run-spec budget drift: run_timeout_ms"): mod.preflight(spec,root)
+    def test_resolve_path_traversal_blocked(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp)/"sub"
+            root.mkdir()
+            outside=Path(tmp)/"outside.txt"
+            outside.write_text("secret", encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "path traversal rejected"):
+                mod.resolve(root, "../outside.txt", "ref")
 
 if __name__=="__main__":unittest.main()

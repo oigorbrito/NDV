@@ -38,6 +38,8 @@ def resolve(root: Path, value: Any, label: str) -> Path:
     if not p.is_absolute():
         p = root / p
     p = p.resolve()
+    if not p.is_relative_to(root.resolve()):
+        raise ValueError(f"{label} path traversal rejected: {p}")
     if not p.is_file():
         raise ValueError(f"{label} not found: {p}")
     return p
