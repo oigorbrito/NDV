@@ -85,7 +85,7 @@ def validate_row(row: dict[str, Any], candidate: dict[str, Any]) -> tuple[list[s
 
 def build_script(base_revision: str, commands: list[str]) -> str:
     lines = ["set +e", "observed_head=$(git rev-parse HEAD 2>/dev/null)", 'printf "__NDV_HEAD__=%s\\n" "$observed_head"', f"if [ \"$observed_head\" != {shlex.quote(base_revision)} ]; then exit 90; fi", "if [ -z \"$(git status --porcelain=v1)\" ]; then echo __NDV_CLEAN__=YES; else echo __NDV_CLEAN__=NO; exit 91; fi", "overall=0"]
-    for idx, command in enumerate(commands, 1): lines.extend([f"eval {shlex.quote(command)}", "rc=$?", f'printf "__NDV_CMD_{idx}_RC__=%s\\n" "$rc"', 'if [ "$rc" -ne 0 ]; then overall=1; fi'])
+    for idx, command in enumerate(commands, 1): lines.extend([f"{command}", "rc=$?", f'printf "__NDV_CMD_{idx}_RC__=%s\\n" "$rc"', 'if [ "$rc" -ne 0 ]; then overall=1; fi'])
     lines.append('exit "$overall"'); return "\n".join(lines)
 def parse_execution_markers(stdout: str, expected_command_count: int) -> dict[str, Any]:
     head, clean = HEAD_RE.search(stdout), CLEAN_RE.search(stdout); observed = {int(i): int(rc) for i, rc in CMD_RC_RE.findall(stdout)}
