@@ -137,6 +137,30 @@ class CodexPromptCompilerTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "record_sha256 mismatch"):
                 mod.compile_prompt(sp, r)
 
+    def test_excessively_long_problem_statement_raises_value_error(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            r = Path(tmp)
+            sp, ap, ep = self.make_fixture(r)
+            executor = json.loads(ep.read_text())
+            executor["task"]["problem_statement"] = "A" * 50001
+            statement_sha = __import__("hashlib").sha256(executor["task"]["problem_statement"].encode()).hexdigest()
+            executor["task_statement_sha256"] = statement_sha
+            executor["executor_visible_sha256"] = mod.sha_value(executor["task"])
+            ep.write_text(json.dumps(executor), encoding="utf-8")
+            admission = json.loads(ap.read_text())
+            admission["source_binding"]["task_statement_sha256"] = statement_sha
+            admission["source_binding"]["executor_visible_sha256"] = executor["executor_visible_sha256"]
+            admission["artifact_integrity"]["executor_visible_file_sha256"] = mod.sha_file(ep)
+            admission["record_sha256"] = mod.sha_value({k:v for k,v in admission.items() if k!="record_sha256"})
+            ap.write_text(json.dumps(admission), encoding="utf-8")
+            spec = json.loads(sp.read_text())
+            spec["task"]["task_statement_sha256"] = statement_sha
+            spec["task"]["admission_record_file_sha256"] = mod.sha_file(ap)
+            spec["task"]["admission_record_sha256"] = admission["record_sha256"]
+            sp.write_text(json.dumps(spec), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "problem_statement exceeds maximum permitted length limit"):
+                mod.compile_prompt(sp, r)
+
 
 if __name__ == "__main__":
     unittest.main()
