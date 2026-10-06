@@ -28,6 +28,55 @@ jobs:
         run: |
           set -euo pipefail
 
+          classify() {
+            local state="$1"
+            local draft="$2"
+            local merge_state="$3"
+            local mergeable="$4"
+            local checks="$5"
+
+            if [[ "$state" != "OPEN" ]]; then
+              printf '%s' "NOT_READY_STATE"
+            elif [[ "$draft" == "true" ]]; then
+              printf '%s' "NOT_READY_DRAFT"
+            elif [[ "$merge_state" == "DIRTY" || "$mergeable" == "CONFLICTING" ]]; then
+              printf '%s' "NOT_READY_CONFLICT"
+            elif [[ "$merge_state" == "BLOCKED" ]]; then
+              printf '%s' "NOT_READY_BLOCKED"
+            elif [[ "$merge_state" == "BEHIND" ]]; then
+              printf '%s' "NOT_READY_BEHIND"
+            elif [[ "$merge_state" == "UNSTABLE" || "$checks" != "SUCCESS" ]]; then
+              printf '%s' "NOT_READY_CHECKS"
+            elif [[ "$merge_state" == "CLEAN" && "$mergeable" == "MERGEABLE" && "$checks" == "SUCCESS" ]]; then
+              printf '%s' "READY_FOR_MERGE_CANDIDATE"
+            else
+              printf '%s' "READINESS_UNKNOWN"
+            fi
+          }
+
+          assert_case() {
+            local expected="$1"
+            shift
+            local actual
+            actual="$(classify "$@")"
+            if [[ "$actual" != "$expected" ]]; then
+              echo "classifier test failed: expected=$expected actual=$actual inputs=$*" >&2
+              exit 1
+            fi
+          }
+
+          # Exercise the fail-closed rule before observing a real pull request.
+          assert_case READY_FOR_MERGE_CANDIDATE OPEN false CLEAN MERGEABLE SUCCESS
+          assert_case NOT_READY_STATE CLOSED false CLEAN MERGEABLE SUCCESS
+          assert_case NOT_READY_DRAFT OPEN true CLEAN MERGEABLE SUCCESS
+          assert_case NOT_READY_CONFLICT OPEN false DIRTY CONFLICTING SUCCESS
+          assert_case NOT_READY_BLOCKED OPEN false BLOCKED MERGEABLE SUCCESS
+          assert_case NOT_READY_BEHIND OPEN false BEHIND MERGEABLE SUCCESS
+          assert_case NOT_READY_CHECKS OPEN false CLEAN MERGEABLE PENDING
+          assert_case NOT_READY_CHECKS OPEN false CLEAN MERGEABLE NONE
+          assert_case READINESS_UNKNOWN OPEN false UNKNOWN UNKNOWN SUCCESS
+          echo "CLASSIFIER_MATRIX=PASS"
+
           query='
           query($owner:String!, $name:String!, $number:Int!) {
             repository(owner:$owner, name:$name) {
@@ -66,37 +115,7 @@ jobs:
           merge_state="$(jq -r '.data.repository.pullRequest.mergeStateStatus' response.json)"
           review="$(jq -r '.data.repository.pullRequest.reviewDecision // "NONE"' response.json)"
           checks="$(jq -r '.data.repository.pullRequest.statusCheckRollup.state // "NONE"' response.json)"
-
-          case "$merge_state" in
-            CLEAN)
-              decision="READY_FOR_MERGE_CANDIDATE"
-              ;;
-            DRAFT)
-              decision="NOT_READY_DRAFT"
-              ;;
-            UNSTABLE)
-              decision="NOT_READY_CHECKS"
-              ;;
-            DIRTY)
-              decision="NOT_READY_CONFLICT"
-              ;;
-            BLOCKED)
-              decision="NOT_READY_BLOCKED"
-              ;;
-            BEHIND)
-              decision="NOT_READY_BEHIND"
-              ;;
-            UNKNOWN)
-              decision="READINESS_UNKNOWN"
-              ;;
-            *)
-              decision="READINESS_UNKNOWN"
-              ;;
-          esac
-
-          if [[ "$draft" == "true" ]]; then
-            decision="NOT_READY_DRAFT"
-          fi
+          decision="$(classify "$state" "$draft" "$merge_state" "$mergeable" "$checks")"
 
           echo "OBSERVATION state=$state draft=$draft mergeStateStatus=$merge_state mergeable=$mergeable reviewDecision=$review checks=$checks base=$base head=$head head_sha=$head_sha decision=$decision"
 
@@ -122,7 +141,7 @@ jobs:
         shell: bash
         run: |
           case "${{ steps.query.outputs.decision }}" in
-            READY_FOR_MERGE_CANDIDATE|NOT_READY_DRAFT|NOT_READY_CHECKS|NOT_READY_CONFLICT|NOT_READY_BLOCKED|NOT_READY_BEHIND|READINESS_UNKNOWN)
+            READY_FOR_MERGE_CANDIDATE|NOT_READY_STATE|NOT_READY_DRAFT|NOT_READY_CHECKS|NOT_READY_CONFLICT|NOT_READY_BLOCKED|NOT_READY_BEHIND|READINESS_UNKNOWN)
               exit 0
               ;;
             *)
