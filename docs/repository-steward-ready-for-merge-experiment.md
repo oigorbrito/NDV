@@ -114,6 +114,16 @@ The classifier's synthetic unknown-state cases passed, but that does not count a
 
 Result: `R7 NATIVE_UNKNOWN = NOT_PROVEN`; `R7 SYNTHETIC_CLASSIFICATION = PASS`.
 
+## Human-gate follow-up
+
+On 2026-10-06, the repository owner authorized attempts to obtain controlled R5 and R6 observations.
+
+- R5 remains `NOT_PROVEN`: no `CODEOWNERS` file or reviewer recipient was identified. No review was sent to a guessed person. The repository-protection endpoint remains unreadable to the active GitHub connection (403); no policy change was made.
+- R6 remains `NOT_PROVEN`: the active GitHub connection has no branch-protection/ruleset write capability. No existing rule was changed, and the fixture observation remains `CLEAN` or pending checks rather than `BEHIND`.
+- R7 remains `NOT_PROVEN` as a native state; no policy mutation can establish a transient GitHub `UNKNOWN` observation without an actual occurrence.
+
+Authorization to attempt these tests is distinct from successful execution. These cases remain pending; no review request or repository rule change is claimed.
+
 ## Decision and authority
 
 ```text
