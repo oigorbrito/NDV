@@ -45,7 +45,24 @@ No automatic merge, review, issue closure, release, rerun, branch deletion or re
 ## Execution status
 
 ```text
-PINNED_REUSE_CONTRACT = DOCUMENTED / IMPLEMENTED
-TWO_PROFILE_IDENTITY_AND_MATRICES = NOT_EXECUTED
+PINNED_REUSE_CONTRACT = DOCUMENTED / IMPLEMENTED / ACCEPTED_IN_RECORDED_SCOPE
+TWO_PROFILE_IDENTITY_AND_MATRICES = EXECUTED_PASS / SYNTHETIC_CORE_ONLY
 THIRD_REPOSITORY_INSTALLATION = NOT_PROVEN
 ```
+
+## Executed two-profile verification — 2026-10-06
+
+Candidate PR #70 exact head `3c44f54fb54ddc2f4bf27e6517770657d74d2a45`; hosted run `37522819853`.
+
+| Profile | Exact source commit | Job | Result |
+| --- | --- | --- | --- |
+| NDV | ed1698905f04f87c6792baf570544fe714bc059e | 112472267302 | source checkout, five core blob identities, two workflow identities, malformed-manifest rejection, syntax and existing matrices PASS |
+| RJ | 5ae90995d235714d622cbc0f7b81005efc62bb92 | 112472267596 | source checkout, five core blob identities, two workflow identities, malformed-manifest rejection, syntax and existing matrices PASS |
+
+Actual logs from both jobs contain the same candidate TESTED_HEAD, REUSE_MANIFEST_REJECTION=PASS (with profile identity), five CORE_IDENTITY PASS lines, two PROFILE_IDENTITY PASS lines, REUSE_IDENTITY with the source commit, CLASSIFIER_MATRIX=PASS, CLASSIFIER_V2_MATRIX=PASS, RUN_ASSOCIATION_MATRIX=PASS and REUSE_EXECUTION scope=SYNTHETIC_CORE_ONLY.
+
+Seven invalid-contract cases were rejected per profile: empty core list, duplicate core entry, empty workflow lists, MERGE authority, wrong source commit, wrong schema version and malformed JSON. Source file lists come from native `git ls-files`; manifest completeness and exact Git blob identities are independently checked. No invalid contract was accepted to obtain PASS.
+
+The candidate's own classifier run `37522819895`, job `112472267102`, independently recorded the same TESTED_HEAD and all three matrices PASS. All eight candidate-head checks completed SUCCESS; native mergeable_state was clean. The initial head `154657fda3915d36106045752c747e541390e213` was superseded by the stricter invalid-manifest guard before acceptance; its earlier execution is not used to qualify that guard.
+
+This accepts the pinned contract's source identity and existing synthetic behavior for both profiles. It does not add native policy coverage, prove a third-repository installation, change either observer or grant write authority. This evidence-only appendix leaves the frozen JSON manifest, tested verifier workflow and common core bytes unchanged. Any subsequent documentation head must pass its own applicable CI before operator merge.
