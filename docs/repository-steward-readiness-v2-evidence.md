@@ -11,7 +11,7 @@ LIVE_NO_REVIEW_CANDIDATE   = EXECUTED_PASS (v2)
 LIVE_REVIEW_VETO           = EXECUTED_PASS (v2)
 V2_ACCEPTED               = YES / READ_REPORT_SCOPE
 DEFAULT_PROTOCOL          = v2 / EXECUTED_PASS
-R5_NATIVE_BLOCKED          = NOT_PROVEN
+R5_NATIVE_BLOCKED          = EXECUTED_PASS (v2 / BLOCKED+PENDING)
 R6_NATIVE_BEHIND           = EXECUTED_PASS (v2)
 ```
 
@@ -80,7 +80,7 @@ This verifies the default command actually runs v2 and preserves the native revi
 
 V2 is accepted within the frozen report-only scope on the executed synthetic matrix and native same-head before/after gate. Acceptance does not authorize merging any observed candidate.
 
-R5 native BLOCKED remains NOT_PROVEN. R6 native BEHIND is now EXECUTED_PASS for v2, as recorded below. R7 has an actual UNKNOWN observation for v2; do not retroactively relabel the v1 experiment. The connector lacks branch-policy write operations and legacy protection reads return HTTP 403.
+R5 native BLOCKED+PENDING and R6 native BEHIND+SUCCESS are EXECUTED_PASS for v2, as recorded below. R7 has an actual UNKNOWN observation for v2; do not retroactively relabel the v1 experiment. The connector lacks branch-policy write operations and legacy protection reads return HTTP 403.
 
 ## R6 native BEHIND — executed controlled policy gate
 
@@ -105,3 +105,22 @@ REST independently reported `mergeable_state=behind` on those refs. The observer
 
 
 Primary project operations use `oigorbrito`. The single explicitly authorized fixture review used `gmailum`. Steward authority remains READ/REPORT; no merge, approval, review request, rerun, release, rule change or branch deletion authority is delegated to its workflow.
+
+## R5 native BLOCKED — up-to-date controlled policy fixture
+
+A fresh, minimal documentation fixture #64 used controlled base `787a9f0ab502fb6bb6cee2ba56fc68572fe484aa` directly as its commit parent. It was up to date with that base, avoiding the BEHIND condition. Existing owner-configured required `Analyze (actions)` policy was retained; no rule, fake check, review or rerun was introduced.
+
+- Exact fixture head: `ebf77dc09dae3047a1da875661da86939c36a5e7`.
+- Observer implementation: `75a8ecad23c8d090a6004aad4f8af8c2c3602874`.
+- Trigger comment: `6017046047`.
+- Run: `37469106157`.
+- Job: `112287613033`.
+- Actual native observation:
+
+```text
+OBSERVATION state=OPEN draft=false mergeStateStatus=BLOCKED mergeable=MERGEABLE reviewDecision=NONE checks=PENDING base=readiness-fixture/r6-base head=readiness-fixture/r5-strict-policy head_sha=ebf77dc09dae3047a1da875661da86939c36a5e7 decision=NOT_READY_BLOCKED protocol=v2
+```
+
+REST independently reported `mergeable_state=blocked` on the exact refs. The actual workflow ran checkout, native query and report-only assertion. This establishes native BLOCKED fail-closed handling for the observed BLOCKED+PENDING combination and its exclusion precedence. It does not establish a native BLOCKED+SUCCESS combination or a review-required policy case. A pending rollup by itself would not establish BLOCKED.
+
+Fixture #64 was closed without merge at 2026-10-06T13:14:06Z; branch retained. R5 and R6 native v2 gates are accepted within these executed scopes. V1 historical NOT_PROVEN results remain unchanged. No additional authority is granted and no repository policy is reconstructed locally.
