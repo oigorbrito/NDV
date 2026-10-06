@@ -54,6 +54,8 @@ jobs:
           manual_count="$(jq '.data.repository.pullRequest.manual.nodes | length' response.json)"
           open_auto_count="$(jq '[.data.repository.pullRequest.auto.nodes[] | select(.state == "OPEN")] | length' response.json)"
 
+          echo "OBSERVATION auto_count=$auto_count manual_count=$manual_count open_auto_count=$open_auto_count merged=$merged base=$base_branch default=$default_branch"
+
           {
             echo "## Repository Steward Native Closure Observer"
             echo
