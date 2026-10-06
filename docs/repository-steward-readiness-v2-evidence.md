@@ -12,7 +12,7 @@ LIVE_REVIEW_VETO           = EXECUTED_PASS (v2)
 V2_ACCEPTED               = YES / READ_REPORT_SCOPE
 DEFAULT_PROTOCOL          = v2 / EXECUTED_PASS
 R5_NATIVE_BLOCKED          = NOT_PROVEN
-R6_NATIVE_BEHIND           = NOT_PROVEN
+R6_NATIVE_BEHIND           = EXECUTED_PASS (v2)
 ```
 
 This report records v2 observations only. It does not rewrite v1 historical results. Implementation presence, merge and workflow success do not establish v2 acceptance.
@@ -80,6 +80,28 @@ This verifies the default command actually runs v2 and preserves the native revi
 
 V2 is accepted within the frozen report-only scope on the executed synthetic matrix and native same-head before/after gate. Acceptance does not authorize merging any observed candidate.
 
-R5 native BLOCKED and R6 native BEHIND remain NOT_PROVEN. Ruleset `24581248` is now active and explicitly targets only `refs/heads/readiness-fixture/r6-base`; branch collection reports that fixture base protected. Its readable rules are only `deletion` and `non_fast_forward`, with no required status check or strict up-to-date requirement. This configuration does not establish BEHIND; R6 remains pending a human-controlled required-check policy on that fixture branch. The connector lacks branch-policy write operations and legacy protection reads return HTTP 403. This restriction is separate from the rejected fixture review. R7 now has an actual UNKNOWN observation for the v2 observer; do not retroactively relabel the v1 experiment.
+R5 native BLOCKED remains NOT_PROVEN. R6 native BEHIND is now EXECUTED_PASS for v2, as recorded below. R7 has an actual UNKNOWN observation for v2; do not retroactively relabel the v1 experiment. The connector lacks branch-policy write operations and legacy protection reads return HTTP 403.
+
+## R6 native BEHIND — executed controlled policy gate
+
+The owner configured ruleset `24581248`, active and targeting only `refs/heads/readiness-fixture/r6-base`. With strict up-to-date true but an empty required-check list, the first v2 probe returned CLEAN: comment `6016967189`, run `37468532681`, job `112285635269`, same fixture head and implementation as below. That probe did not establish BEHIND.
+
+The owner then selected required check `Analyze (actions)`, integration `15368`, retaining `strict_required_status_checks_policy=true`. No repository rule was changed by the observer or this connector.
+
+- Fixture: PR #50.
+- Observer implementation: `75a8ecad23c8d090a6004aad4f8af8c2c3602874`.
+- Exact unchanged head: `b3c0d262265847663b3d224d741b4422a9e6ba17`.
+- Exact base: `787a9f0ab502fb6bb6cee2ba56fc68572fe484aa`.
+- Trigger comment: `6017003711`.
+- Run: `37468795880`.
+- Job: `112286542274`.
+- Actual native observation:
+
+```text
+OBSERVATION state=OPEN draft=false mergeStateStatus=BEHIND mergeable=MERGEABLE reviewDecision=NONE checks=SUCCESS base=readiness-fixture/r6-base head=readiness-fixture/r6-head head_sha=b3c0d262265847663b3d224d741b4422a9e6ba17 decision=NOT_READY_BEHIND protocol=v2
+```
+
+REST independently reported `mergeable_state=behind` on those refs. The observer executed checkout, query and report-only assertion. This is native BEHIND fail-closed evidence for v2; it does not establish BLOCKED or rewrite v1 historical results. Fixture #50 was closed again without merge at 2026-10-06T13:11:42Z; both fixture branches retained. No rerun, merge, rule write or branch deletion occurred in this probe.
+
 
 Primary project operations use `oigorbrito`. The single explicitly authorized fixture review used `gmailum`. Steward authority remains READ/REPORT; no merge, approval, review request, rerun, release, rule change or branch deletion authority is delegated to its workflow.
