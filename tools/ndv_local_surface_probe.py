@@ -125,11 +125,16 @@ def classify(report: dict[str, Any]) -> dict[str, Any]:
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--out", type=Path)
+    ap.add_argument(
+        "--omit-timestamp",
+        action="store_true",
+        help="record timestamp_utc as NOT_RECORDED for deterministic output",
+    )
     args = ap.parse_args()
 
     report: dict[str, Any] = {
         "schema_id": "ndv-local-surface-probe-v1",
-        "timestamp_utc": datetime.now(timezone.utc).isoformat(),
+        "timestamp_utc": "NOT_RECORDED" if args.omit_timestamp else datetime.now(timezone.utc).isoformat(),
         "read_only": True,
         "downloads_performed": False,
         "credentials_used": False,
