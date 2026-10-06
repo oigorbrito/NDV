@@ -1,0 +1,123 @@
+name: Repository Steward Readiness Observer
+
+on:
+  pull_request_target:
+    types: [opened, edited, reopened, synchronize, ready_for_review, converted_to_draft, review_requested, review_request_removed, submitted, dismissed]
+
+permissions:
+  contents: read
+  pull-requests: read
+  checks: read
+  statuses: read
+
+jobs:
+  observe:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      OWNER: ${{ github.repository_owner }}
+      REPO: ${{ github.event.repository.name }}
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+    steps:
+      - name: Query GitHub-native readiness state
+        id: query
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          query='
+          query($owner:String!, $name:String!, $number:Int!) {
+            repository(owner:$owner, name:$name) {
+              pullRequest(number:$number) {
+                number
+                state
+                isDraft
+                baseRefName
+                headRefName
+                headRefOid
+                mergeable
+                mergeStateStatus
+                reviewDecision
+                statusCheckRollup {
+                  state
+                }
+              }
+            }
+          }'
+
+          gh api graphql             -f query="$query"             -F owner="$OWNER"             -F name="$REPO"             -F number="$PR_NUMBER"             > response.json
+
+          jq -e '.data.repository.pullRequest != null' response.json >/dev/null
+
+          state="$(jq -r '.data.repository.pullRequest.state' response.json)"
+          draft="$(jq -r '.data.repository.pullRequest.isDraft' response.json)"
+          base="$(jq -r '.data.repository.pullRequest.baseRefName' response.json)"
+          head="$(jq -r '.data.repository.pullRequest.headRefName' response.json)"
+          head_sha="$(jq -r '.data.repository.pullRequest.headRefOid' response.json)"
+          mergeable="$(jq -r '.data.repository.pullRequest.mergeable' response.json)"
+          merge_state="$(jq -r '.data.repository.pullRequest.mergeStateStatus' response.json)"
+          review="$(jq -r '.data.repository.pullRequest.reviewDecision // "NONE"' response.json)"
+          checks="$(jq -r '.data.repository.pullRequest.statusCheckRollup.state // "NONE"' response.json)"
+
+          case "$merge_state" in
+            CLEAN)
+              decision="READY_FOR_MERGE_CANDIDATE"
+              ;;
+            DRAFT)
+              decision="NOT_READY_DRAFT"
+              ;;
+            UNSTABLE)
+              decision="NOT_READY_CHECKS"
+              ;;
+            DIRTY)
+              decision="NOT_READY_CONFLICT"
+              ;;
+            BLOCKED)
+              decision="NOT_READY_BLOCKED"
+              ;;
+            BEHIND)
+              decision="NOT_READY_BEHIND"
+              ;;
+            UNKNOWN)
+              decision="READINESS_UNKNOWN"
+              ;;
+            *)
+              decision="READINESS_UNKNOWN"
+              ;;
+          esac
+
+          if [[ "$draft" == "true" ]]; then
+            decision="NOT_READY_DRAFT"
+          fi
+
+          echo "OBSERVATION state=$state draft=$draft mergeStateStatus=$merge_state mergeable=$mergeable reviewDecision=$review checks=$checks base=$base head=$head head_sha=$head_sha decision=$decision"
+
+          {
+            echo "## Repository Steward Readiness Observer"
+            echo
+            echo "- PR: #$PR_NUMBER"
+            echo "- state: $state"
+            echo "- draft: $draft"
+            echo "- base: $base"
+            echo "- head: $head"
+            echo "- head SHA: $head_sha"
+            echo "- mergeable: $mergeable"
+            echo "- mergeStateStatus: $merge_state"
+            echo "- reviewDecision: $review"
+            echo "- statusCheckRollup: $checks"
+            echo "- decision: $decision"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          echo "decision=$decision" >> "$GITHUB_OUTPUT"
+
+      - name: Assert report-only decision
+        shell: bash
+        run: |
+          case "${{ steps.query.outputs.decision }}" in
+            READY_FOR_MERGE_CANDIDATE|NOT_READY_DRAFT|NOT_READY_CHECKS|NOT_READY_CONFLICT|NOT_READY_BLOCKED|NOT_READY_BEHIND|READINESS_UNKNOWN)
+              exit 0
+              ;;
+            *)
+              exit 1
+              ;;
+          esac
