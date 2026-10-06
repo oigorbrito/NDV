@@ -75,7 +75,7 @@ Result: `R2 DRAFT = PASS`; `MERGE_STATE_STATUS_ALONE = REJECTED`.
 
 ### R4 — conflict
 
-Post-merge integrated observer on fixture PR #48, head `2bb327f294c27f12fa4fe4200f0d713f9cbcc361):
+Post-merge integrated observer on fixture PR #48, head `2bb327f294c27f12fa4fe4200f0d713f9cbcc361`:
 
 ```text
 state=OPEN
@@ -94,7 +94,7 @@ Result: `R4 LIVE_NATIVE_OBSERVATION = PASS`.
 
 Fixture PR #49 did not produce a block. Both the settled pre-merge run `37410839432`, job `112098698480`, and post-merge integrated run `37414415806`, job `112109746306`, observed `CLEAN / MERGEABLE / reviewDecision=NONE / SUCCESS`.
 
-The ruleset read returned an empty list. The branch-protection read returned 403; this does not establish absence of protection. No reviewer was requested and no rule was changed.
+The ruleset read returned an empty list. The branch-protection read returned 403; this does not establish absence of protection. During the original observation no review request was attempted and no rule was changed. Subsequent authorized review-request attempts are recorded below.
 
 Result: `R5 BLOCKED = NOT_PROVEN`.
 
@@ -118,11 +118,15 @@ Result: `R7 NATIVE_UNKNOWN = NOT_PROVEN`; `R7 SYNTHETIC_CLASSIFICATION = PASS`.
 
 On 2026-10-06, the repository owner authorized attempts to obtain controlled R5 and R6 observations.
 
-- R5 remains `NOT_PROVEN`: no `CODEOWNERS` file or reviewer recipient was identified. No review was sent to a guessed person. The repository-protection endpoint remains unreadable to the active GitHub connection (403); no policy change was made.
+- R5 remains `NOT_PROVEN`: no `CODEOWNERS` or historical reviewer target was available. The owner's secondary account `gmailum` was subsequently selected for the controlled probe. Two review-request attempts on fixture PR #49 were rejected by GitHub with HTTP 422, `Reviews may only be requested from collaborators`. No review request was created. The fixture was closed again without merge after each rejected attempt.
 - R6 remains `NOT_PROVEN`: the active GitHub connection has no branch-protection/ruleset write capability. No existing rule was changed, and the fixture observation remains `CLEAN` or pending checks rather than `BEHIND`.
 - R7 remains `NOT_PROVEN` as a native state; no policy mutation can establish a transient GitHub `UNKNOWN` observation without an actual occurrence.
 
-Authorization to attempt these tests is distinct from successful execution. These cases remain pending; no review request or repository rule change is claimed.
+Both GitHub account connections were independently verified on 2026-10-06: `oigorbrito` (ID `324628472`) is the primary account and `gmailum` (ID `55462235`) is the secondary account. Repository metadata obtained through the primary connection reports administrative/write permissions; the secondary connection reports read access with `push=false` and `admin=false`. Connecting an account does not establish collaborator eligibility: the review-request endpoint's HTTP 422 is the direct evidence for this fixture.
+
+The branch-protection read was repeated explicitly through the primary connection and still returned HTTP 403, `Resource not accessible by integration`. The readable ruleset collection returned `[]`; this does not establish absence of classic branch protection. The available connector has no collaborator-invitation or branch-policy write operation. The earlier browser Google OAuth attempt returned 502; no repository rule was changed.
+
+Authorization to attempt these tests is distinct from successful execution. These cases remain pending; no successful review request or repository rule change is claimed. The controlled operator attempts do not expand the report-only steward's authority.
 
 ## Decision and authority
 
@@ -162,4 +166,4 @@ POSITIVE_RULE_EXECUTED     = PASS
 LIVE_NATIVE_EXPERIMENT     = PARTIALLY_EXECUTED
 ```
 
-R5 and R6 need repository-policy/review conditions that were not authorized for mutation. R7's native unknown state was not observed; no synthetic result is promoted to a live-state PASS.
+R5 and R6 need live repository-policy/review conditions that the authorized attempts could not establish with the available access. R5 still lacks an eligible collaborator for a blocking-review probe; R6 still lacks usable branch-policy administration. R7's native unknown state was not observed; no synthetic result is promoted to a live-state PASS.
