@@ -66,3 +66,7 @@ Seven invalid-contract cases were rejected per profile: empty core list, duplica
 The candidate's own classifier run `37522819895`, job `112472267102`, independently recorded the same TESTED_HEAD and all three matrices PASS. All eight candidate-head checks completed SUCCESS; native mergeable_state was clean. The initial head `154657fda3915d36106045752c747e541390e213` was superseded by the stricter invalid-manifest guard before acceptance; its earlier execution is not used to qualify that guard.
 
 This accepts the pinned contract's source identity and existing synthetic behavior for both profiles. It does not add native policy coverage, prove a third-repository installation, change either observer or grant write authority. This evidence-only appendix leaves the frozen JSON manifest, tested verifier workflow and common core bytes unchanged. Any subsequent documentation head must pass its own applicable CI before operator merge.
+
+## Subsequent target acceptance — Searchleads
+
+The execution status above records the original two-profile contract gate. Subsequent target-native acceptance is recorded separately in [the Searchleads target register](repository-steward-readiness-searchleads-target-register.md). Searchleads is accepted for automatic READ/REPORT under its executed conditions, with two explicit adaptations; it is not byte-identical to either frozen profile. Manifest v1 and its original verifier remain unchanged. Copying the target files elsewhere still requires target acceptance.
