@@ -4,7 +4,7 @@
 
 `PARTIALLY_EXECUTED / POSITIVE_RULE_QUALIFIED / NATIVE_BLOCKED_STATES_NOT_PROVEN`
 
-The positive readiness rule is implemented and executed. R4 conflict is proven with a live native observation. The live native states for R5–R7 remain unproven; synthetic matrix coverage is reported separately.
+The positive readiness rule is implemented and executed. R4 conflict is proven with a live native observation. The live native states for R5–R7 remain unproven; synthetic matrix coverage is reported separately. A subsequent live review challenge demonstrated that the approved v1 rule can report a candidate while `reviewDecision=CHANGES_REQUESTED`; review-veto handling is not qualified.
 
 ## Claim
 
@@ -98,6 +98,32 @@ The ruleset read returned an empty list. The branch-protection read returned 403
 
 Result: `R5 BLOCKED = NOT_PROVEN`.
 
+
+### R5 follow-up — collaborator review challenge
+
+After the earlier HTTP 422 attempts, `gmailum` was verified with repository `write` permission. The authenticated secondary login was independently verified as `gmailum` (ID `55462235`). The primary operator remained `oigorbrito`.
+
+The authorized review request on fixture PR #49 succeeded. Controlled review `5428005185` submitted `CHANGES_REQUESTED` on the unchanged fixture head `699f24d099de1378b8df995c945216b6eaf80314`. This was an explicitly labelled experimental state injection, not a production defect claim.
+
+Integrated observer implementation `9f7bbcbc910a778bc3e31a900269f5c94e4d2187`, run `37460492814`, job `112258556785`, executed checkout, query, and assertion steps successfully. The actual query log was:
+
+```text
+state=OPEN
+draft=false
+mergeStateStatus=CLEAN
+mergeable=MERGEABLE
+reviewDecision=CHANGES_REQUESTED
+checks=SUCCESS
+base=main
+head=readiness-fixture/r5-policy-probe
+head_sha=699f24d099de1378b8df995c945216b6eaf80314
+decision=READY_FOR_MERGE_CANDIDATE
+```
+
+The approved five-field v1 rule was faithfully implemented; it does not use `reviewDecision` as a veto. This live counterexample rejects the stronger inference that `CLEAN / MERGEABLE / SUCCESS` necessarily excludes changes-requested reviews in this repository configuration. The workflow's successful conclusion proves execution, not acceptance of review-veto handling.
+
+`R5 REVIEW_CHALLENGE_EXECUTED = YES`; `R5 NATIVE_BLOCKED = NOT_PROVEN`; `V1 REVIEW_VETO_HANDLING = NOT_QUALIFIED`. This is distinct from the unchanged v1 classifier matrix PASS. The fixture was closed without merge after observation, its branch and review retained as evidence. No repository rule changed. Any altered decision semantics require a separate version and approval; do not silently change the approved v1 rule or historical observations.
+
 ### R6 — behind base
 
 The divergent fixture PR #50 returned `CLEAN / MERGEABLE / SUCCESS`, not `BEHIND`, after checks settled (run `37410794935`, job `112098559804`). The post-merge smoke encountered `UNSTABLE / MERGEABLE / PENDING -> NOT_READY_CHECKS` (run `37414469141`, job `112109908382`), which did not exercise the behind state.
@@ -157,6 +183,8 @@ R1 CLEAN                   = PASS
 R2 draft                   = PASS
 R4 conflict (live)         = PASS
 R5 blocked (live)          = NOT_PROVEN
+R5 review challenge (live) = EXECUTED
+V1 review-veto handling    = NOT_QUALIFIED
 R6 behind (live)           = NOT_PROVEN
 R7 unknown (live)          = NOT_PROVEN
 R7 unknown (synthetic)     = PASS
@@ -166,4 +194,4 @@ POSITIVE_RULE_EXECUTED     = PASS
 LIVE_NATIVE_EXPERIMENT     = PARTIALLY_EXECUTED
 ```
 
-R5 and R6 need live repository-policy/review conditions that the authorized attempts could not establish with the available access. R5 still lacks an eligible collaborator for a blocking-review probe; R6 still lacks usable branch-policy administration. R7's native unknown state was not observed; no synthetic result is promoted to a live-state PASS.
+R5 and R6 need live repository-policy/review conditions that the authorized attempts could not establish with the available access. R5 now has an eligible collaborator and an executed changes-requested review challenge, but GitHub still reported CLEAN rather than BLOCKED. R6 still lacks usable branch-policy administration. R7's native unknown state was not observed; no synthetic result is promoted to a live-state PASS.
