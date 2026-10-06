@@ -1,8 +1,8 @@
 name: Repository Steward Readiness Observer
 
 on:
-  pull_request_target:
-    types: [opened, edited, reopened, synchronize, ready_for_review, converted_to_draft, review_requested, review_request_removed, submitted, dismissed]
+  issue_comment:
+    types: [created]
 
 permissions:
   contents: read
@@ -12,12 +12,15 @@ permissions:
 
 jobs:
   observe:
+    if: >
+      github.event.issue.pull_request != null &&
+      github.event.comment.body == '/readiness-observe'
     runs-on: ubuntu-latest
     env:
       GH_TOKEN: ${{ github.token }}
       OWNER: ${{ github.repository_owner }}
       REPO: ${{ github.event.repository.name }}
-      PR_NUMBER: ${{ github.event.pull_request.number }}
+      PR_NUMBER: ${{ github.event.issue.number }}
     steps:
       - name: Query GitHub-native readiness state
         id: query
@@ -45,7 +48,12 @@ jobs:
             }
           }'
 
-          gh api graphql             -f query="$query"             -F owner="$OWNER"             -F name="$REPO"             -F number="$PR_NUMBER"             > response.json
+          gh api graphql \
+            -f query="$query" \
+            -F owner="$OWNER" \
+            -F name="$REPO" \
+            -F number="$PR_NUMBER" \
+            > response.json
 
           jq -e '.data.repository.pullRequest != null' response.json >/dev/null
 
