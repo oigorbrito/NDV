@@ -1,0 +1,85 @@
+name: Repository Steward Native Closure Observer
+
+on:
+  pull_request_target:
+    types: [opened, edited, reopened, synchronize, closed]
+
+permissions:
+  contents: read
+  issues: read
+  pull-requests: read
+
+jobs:
+  observe:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      OWNER: ${{ github.repository_owner }}
+      REPO: ${{ github.event.repository.name }}
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+    steps:
+      - name: Query GitHub-native closing relationships
+        id: query
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          query='
+          query($owner:String!, $name:String!, $number:Int!) {
+            repository(owner:$owner, name:$name) {
+              defaultBranchRef { name }
+              pullRequest(number:$number) {
+                number
+                baseRefName
+                merged
+                auto: closingIssuesReferences(first:100, excludeUserLinked:true) {
+                  nodes { number state url }
+                }
+                manual: closingIssuesReferences(first:100, userLinkedOnly:true) {
+                  nodes { number state url }
+                }
+              }
+            }
+          }'
+
+          gh api graphql             -f query="$query"             -F owner="$OWNER"             -F name="$REPO"             -F number="$PR_NUMBER"             > response.json
+
+          jq -e '.data.repository.pullRequest != null' response.json >/dev/null
+
+          default_branch="$(jq -r '.data.repository.defaultBranchRef.name' response.json)"
+          base_branch="$(jq -r '.data.repository.pullRequest.baseRefName' response.json)"
+          merged="$(jq -r '.data.repository.pullRequest.merged' response.json)"
+
+          auto_count="$(jq '.data.repository.pullRequest.auto.nodes | length' response.json)"
+          manual_count="$(jq '.data.repository.pullRequest.manual.nodes | length' response.json)"
+          open_auto_count="$(jq '[.data.repository.pullRequest.auto.nodes[] | select(.state == "OPEN")] | length' response.json)"
+
+          {
+            echo "## Repository Steward Native Closure Observer"
+            echo
+            echo "- PR: #$PR_NUMBER"
+            echo "- default branch: `$default_branch`"
+            echo "- PR base: `$base_branch`"
+            echo "- merged: `$merged`"
+            echo "- auto-detected closing references: `$auto_count`"
+            echo "- manually linked references: `$manual_count`"
+            echo "- open auto-detected references: `$open_auto_count`"
+            echo
+            echo "### Auto-detected closing references"
+            jq -r '.data.repository.pullRequest.auto.nodes[]? | "- #\(.number) state=\(.state) \(.url)"' response.json
+            echo
+            echo "### Manually linked references"
+            jq -r '.data.repository.pullRequest.manual.nodes[]? | "- #\(.number) state=\(.state) \(.url)"' response.json
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [[ "$merged" == "true" && "$base_branch" == "$default_branch" && "$open_auto_count" -gt 0 ]]; then
+            echo "decision=CLOSURE_CANDIDATE" >> "$GITHUB_OUTPUT"
+            echo "::notice::CLOSURE_CANDIDATE"
+          else
+            echo "decision=NO_CLOSURE_CANDIDATE" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Assert read-only authority
+        shell: bash
+        run: |
+          test "${{ steps.query.outputs.decision }}" = "CLOSURE_CANDIDATE" ||           test "${{ steps.query.outputs.decision }}" = "NO_CLOSURE_CANDIDATE"
