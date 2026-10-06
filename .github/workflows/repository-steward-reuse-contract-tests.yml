@@ -51,23 +51,47 @@ jobs:
           echo "TESTED_HEAD=$(git rev-parse HEAD)"
           actual_source=$(git -C qualification/reference rev-parse HEAD)
           test "$actual_source" = "$SOURCE_COMMIT"
-          jq -e --arg profile "$PROFILE" --arg repo "$SOURCE_REPOSITORY" --arg commit "$SOURCE_COMMIT" '
-            .schema_version == 1 and .protocol == "v2" and .authority == ["READ","REPORT"] and
-            (.common_files | length == 5) and
-            ([.profiles[] | select(.id == $profile and .repository == $repo and .commit == $commit)] | length == 1)
-          ' "$manifest" >/dev/null
+          core_paths=$(git -C qualification/reference ls-files '.github/scripts/repository-steward-readiness*.sh' | jq -Rsc 'split("\n") | map(select(length > 0)) | sort')
+          workflow_paths=$(git -C qualification/reference ls-files '.github/workflows/repository-steward-readiness*.yml' | jq -Rsc 'split("\n") | map(select(length > 0)) | sort')
+          validate_manifest() {
+            jq -e --arg profile "$PROFILE" --arg repo "$SOURCE_REPOSITORY" --arg commit "$SOURCE_COMMIT" \
+              --argjson core_paths "$core_paths" --argjson workflow_paths "$workflow_paths" '
+              .schema_version == 1 and .protocol == "v2" and .authority == ["READ","REPORT"] and
+              (.common_files | map(.path) | sort) == $core_paths and
+              (.profiles | map(.id) | sort) == ["ndv","rj"] and
+              ([.profiles[] | select(.id == $profile and .repository == $repo and .commit == $commit)] | length == 1) and
+              ([.profiles[] | select(.id == $profile) | .workflow_files | map(.path) | sort] == [$workflow_paths]) and
+              all(.common_files[]; (.git_blob_sha | type) == "string" and (.git_blob_sha | test("^[0-9a-f]{40}$"))) and
+              all(.profiles[].workflow_files[]; (.git_blob_sha | type) == "string" and (.git_blob_sha | test("^[0-9a-f]{40}$")))
+            ' "$1" >/dev/null
+          }
+          validate_manifest "$manifest"
+          task_dir=$(mktemp -d)
+          trap 'rm -rf "$task_dir"' EXIT
+          for mutation in '.common_files=[]' '.common_files[1]=.common_files[0]' '.profiles |= map(.workflow_files=[])' '.authority+=["MERGE"]' '.profiles |= map(.commit="0000000000000000000000000000000000000000")' '.schema_version=2'; do
+            jq "$mutation" "$manifest" > "$task_dir/invalid.json"
+            if validate_manifest "$task_dir/invalid.json"; then
+              echo "Invalid reuse manifest admitted: $mutation" >&2
+              exit 1
+            fi
+          done
+          printf '{' > "$task_dir/invalid.json"
+          if validate_manifest "$task_dir/invalid.json" 2>/dev/null; then exit 1; fi
+          echo "REUSE_MANIFEST_REJECTION profile=$PROFILE decision=PASS"
+          jq -r '.common_files[] | [.path,.git_blob_sha] | @tsv' "$manifest" > "$task_dir/core.tsv"
+          jq -r --arg profile "$PROFILE" '.profiles[] | select(.id == $profile) | .workflow_files[] | [.path,.git_blob_sha] | @tsv' "$manifest" > "$task_dir/workflows.tsv"
           while IFS=$'\t' read -r path expected; do
             candidate=$(git hash-object -- "$path")
             source=$(git -C qualification/reference hash-object -- "$path")
             test "$candidate" = "$expected"
             test "$source" = "$expected"
             echo "CORE_IDENTITY profile=$PROFILE path=$path blob=$source decision=PASS"
-          done < <(jq -r '.common_files[] | [.path,.git_blob_sha] | @tsv' "$manifest")
+          done < "$task_dir/core.tsv"
           while IFS=$'\t' read -r path expected; do
             source=$(git -C qualification/reference hash-object -- "$path")
             test "$source" = "$expected"
             echo "PROFILE_IDENTITY profile=$PROFILE path=$path blob=$source decision=PASS"
-          done < <(jq -r --arg profile "$PROFILE" '.profiles[] | select(.id == $profile) | .workflow_files[] | [.path,.git_blob_sha] | @tsv' "$manifest")
+          done < "$task_dir/workflows.tsv"
           echo "REUSE_IDENTITY profile=$PROFILE source=$SOURCE_REPOSITORY source_commit=$actual_source decision=PASS"
 
       - name: Execute existing matrices from pinned source
