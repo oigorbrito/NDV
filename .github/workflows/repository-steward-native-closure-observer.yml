@@ -58,12 +58,12 @@ jobs:
             echo "## Repository Steward Native Closure Observer"
             echo
             echo "- PR: #$PR_NUMBER"
-            echo "- default branch: `$default_branch`"
-            echo "- PR base: `$base_branch`"
-            echo "- merged: `$merged`"
-            echo "- auto-detected closing references: `$auto_count`"
-            echo "- manually linked references: `$manual_count`"
-            echo "- open auto-detected references: `$open_auto_count`"
+            echo "- default branch: $default_branch"
+            echo "- PR base: $base_branch"
+            echo "- merged: $merged"
+            echo "- auto-detected closing references: $auto_count"
+            echo "- manually linked references: $manual_count"
+            echo "- open auto-detected references: $open_auto_count"
             echo
             echo "### Auto-detected closing references"
             jq -r '.data.repository.pullRequest.auto.nodes[]? | "- #\(.number) state=\(.state) \(.url)"' response.json
