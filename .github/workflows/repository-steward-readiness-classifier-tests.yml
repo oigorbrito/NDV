@@ -2,10 +2,6 @@ name: Repository Steward Readiness Classifier Tests
 
 on:
   pull_request:
-    paths:
-      - '.github/scripts/repository-steward-readiness-classifier*.sh'
-      - '.github/workflows/repository-steward-readiness-observer.yml'
-      - '.github/workflows/repository-steward-readiness-classifier-tests.yml'
 
 permissions:
   contents: read
@@ -16,10 +12,21 @@ jobs:
     steps:
       - name: Check out pull request head
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: Record tested head
+        run: |
+          echo "TESTED_HEAD=$(git rev-parse HEAD)"
+          test -z "$(git status --porcelain)"
       - name: Check shell syntax
         run: |
           bash -n .github/scripts/repository-steward-readiness-classifier.sh
           bash -n .github/scripts/repository-steward-readiness-classifier-v2.sh
           bash -n .github/scripts/repository-steward-readiness-classifier-v2-tests.sh
+          bash -n .github/scripts/repository-steward-readiness-run-association.sh
+          bash -n .github/scripts/repository-steward-readiness-run-association-tests.sh
       - name: Run fail-closed decision matrix
         run: bash .github/scripts/repository-steward-readiness-classifier-v2-tests.sh
+
+      - name: Run current-head association matrix
+        run: bash .github/scripts/repository-steward-readiness-run-association-tests.sh
