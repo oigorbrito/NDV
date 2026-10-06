@@ -12,6 +12,8 @@ readiness_classify() {
     printf '%s' "NOT_READY_STATE"
   elif [[ "$draft" == "true" ]]; then
     printf '%s' "NOT_READY_DRAFT"
+  elif [[ "$draft" != "false" ]]; then
+    printf '%s' "READINESS_UNKNOWN"
   elif [[ "$merge_state" == "DIRTY" || "$mergeable" == "CONFLICTING" ]]; then
     printf '%s' "NOT_READY_CONFLICT"
   elif [[ "$merge_state" == "BLOCKED" ]]; then
@@ -42,6 +44,8 @@ readiness_classifier_self_test() {
   readiness_assert_case READY_FOR_MERGE_CANDIDATE OPEN false CLEAN MERGEABLE SUCCESS
   readiness_assert_case NOT_READY_STATE CLOSED false CLEAN MERGEABLE SUCCESS
   readiness_assert_case NOT_READY_DRAFT OPEN true CLEAN MERGEABLE SUCCESS
+  readiness_assert_case READINESS_UNKNOWN OPEN UNKNOWN CLEAN MERGEABLE SUCCESS
+  readiness_assert_case READINESS_UNKNOWN OPEN null CLEAN MERGEABLE SUCCESS
   readiness_assert_case NOT_READY_CONFLICT OPEN false DIRTY CONFLICTING SUCCESS
   readiness_assert_case NOT_READY_CONFLICT OPEN false CLEAN CONFLICTING SUCCESS
   readiness_assert_case NOT_READY_BLOCKED OPEN false BLOCKED MERGEABLE SUCCESS
