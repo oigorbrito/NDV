@@ -10,7 +10,7 @@ LIVE_NATIVE_UNKNOWN       = EXECUTED_PASS (v2)
 LIVE_NO_REVIEW_CANDIDATE   = EXECUTED_PASS (v2)
 LIVE_REVIEW_VETO           = EXECUTED_PASS (v2)
 V2_ACCEPTED               = YES / READ_REPORT_SCOPE
-DEFAULT_PROTOCOL          = v2 (activation routing; post-merge smoke pending)
+DEFAULT_PROTOCOL          = v2 / EXECUTED_PASS
 R5_NATIVE_BLOCKED          = NOT_PROVEN
 R6_NATIVE_BEHIND           = NOT_PROVEN
 ```
@@ -66,12 +66,20 @@ The same-head positive baseline and native review veto both passed. This qualifi
 
 ## Activation and cleanup
 
-The activation change selects v2 for the standard command and retains explicit v1 reproduction. Post-merge default-command execution is still pending and is not inferred from configuration. Fixture #59 stays open temporarily for that smoke observation using the existing review, then must close without merge. No additional review is needed. Earlier fixtures #48–#51 remain closed without merge. No branch was deleted and no repository rule changed.
+The activation change selects v2 for the standard command and retains explicit v1 reproduction. PR #61 activation head `5a7d5fb59174fb7e6d4b45d16d6cf495cc1c0187` passed all six exact-head checks. Hosted classifier run `37467590705`, job `112282415451`, recorded both classifier matrices PASS. It merged as `e587247197db28501f1ad27cc9946ee28d77bbbe`.
+
+Default-command trigger `/readiness-observe`, comment `6016858543`, run `37467755522`, job `112282980804`, used that implementation and encountered native UNKNOWN; it returned READINESS_UNKNOWN protocol=v2. A settled observation, comment `6016869589`, run `37467828436`, job `112283228723`, used the same implementation and fixture head:
+
+```text
+OBSERVATION state=OPEN draft=false mergeStateStatus=CLEAN mergeable=MERGEABLE reviewDecision=CHANGES_REQUESTED checks=SUCCESS base=main head=readiness-fixture/v2-review-veto head_sha=4621120d2c223896ad2502a1f7ead12d72cca0ff decision=NOT_READY_REVIEW protocol=v2
+```
+
+This verifies the default command actually runs v2 and preserves the native review veto. Fixture #59 was closed without merge on 2026-10-06T13:03:59Z; its exact head, branch and experimental review were retained. No additional review was submitted. Earlier fixtures #48–#51 remain closed without merge. No branch was deleted and no repository rule changed.
 
 ## Acceptance boundary and remaining work
 
 V2 is accepted within the frozen report-only scope on the executed synthetic matrix and native same-head before/after gate. Acceptance does not authorize merging any observed candidate.
 
-R5 native BLOCKED and R6 native BEHIND remain NOT_PROVEN. The connector still lacks branch-policy write operations and protection reads return HTTP 403. This restriction is separate from the rejected fixture review. R7 now has an actual UNKNOWN observation for the v2 observer; do not retroactively relabel the v1 experiment.
+R5 native BLOCKED and R6 native BEHIND remain NOT_PROVEN. Ruleset `24581248` is now active and explicitly targets only `refs/heads/readiness-fixture/r6-base`; branch collection reports that fixture base protected. Its readable rules are only `deletion` and `non_fast_forward`, with no required status check or strict up-to-date requirement. This configuration does not establish BEHIND; R6 remains pending a human-controlled required-check policy on that fixture branch. The connector lacks branch-policy write operations and legacy protection reads return HTTP 403. This restriction is separate from the rejected fixture review. R7 now has an actual UNKNOWN observation for the v2 observer; do not retroactively relabel the v1 experiment.
 
 Primary project operations use `oigorbrito`. The single explicitly authorized fixture review used `gmailum`. Steward authority remains READ/REPORT; no merge, approval, review request, rerun, release, rule change or branch deletion authority is delegated to its workflow.
