@@ -14,13 +14,14 @@ jobs:
   observe:
     if: >
       github.event.issue.pull_request != null &&
-      github.event.comment.body == '/readiness-observe'
+      (github.event.comment.body == '/readiness-observe' || github.event.comment.body == '/readiness-observe-v2')
     runs-on: ubuntu-latest
     env:
       GH_TOKEN: ${{ github.token }}
       OWNER: ${{ github.repository_owner }}
       REPO: ${{ github.event.repository.name }}
       PR_NUMBER: ${{ github.event.issue.number }}
+      READINESS_VERSION: ${{ github.event.comment.body == '/readiness-observe-v2' && 'v2' || 'v1' }}
     steps:
       - name: Check out the default-branch classifier
         uses: actions/checkout@v4
@@ -61,23 +62,36 @@ jobs:
 
           jq -e '.data.repository.pullRequest != null' response.json >/dev/null
 
-          state="$(jq -r '.data.repository.pullRequest.state' response.json)"
-          draft="$(jq -r '.data.repository.pullRequest.isDraft' response.json)"
-          base="$(jq -r '.data.repository.pullRequest.baseRefName' response.json)"
-          head="$(jq -r '.data.repository.pullRequest.headRefName' response.json)"
-          head_sha="$(jq -r '.data.repository.pullRequest.headRefOid' response.json)"
-          mergeable="$(jq -r '.data.repository.pullRequest.mergeable' response.json)"
-          merge_state="$(jq -r '.data.repository.pullRequest.mergeStateStatus' response.json)"
-          review="$(jq -r '.data.repository.pullRequest.reviewDecision // "NONE"' response.json)"
-          checks="$(jq -r '.data.repository.pullRequest.statusCheckRollup.state // "NONE"' response.json)"
-          decision="$(readiness_classify "$state" "$draft" "$merge_state" "$mergeable" "$checks")"
+          if [[ "$READINESS_VERSION" == v2 ]]; then
+            source .github/scripts/repository-steward-readiness-classifier-v2.sh
+            if extracted="$(readiness_extract_v2 response.json)"; then
+              IFS=$'\t' read -r state draft base head head_sha mergeable merge_state review checks <<< "$extracted"
+              decision="$(readiness_classify_v2 "$state" "$draft" "$merge_state" "$mergeable" "$checks" "$review")"
+            else
+              state=UNKNOWN draft=UNKNOWN base=UNKNOWN head=UNKNOWN head_sha=UNKNOWN
+              mergeable=UNKNOWN merge_state=UNKNOWN review=UNKNOWN checks=UNKNOWN
+              decision=READINESS_UNKNOWN
+            fi
+          else
+            state="$(jq -r '.data.repository.pullRequest.state' response.json)"
+            draft="$(jq -r '.data.repository.pullRequest.isDraft' response.json)"
+            base="$(jq -r '.data.repository.pullRequest.baseRefName' response.json)"
+            head="$(jq -r '.data.repository.pullRequest.headRefName' response.json)"
+            head_sha="$(jq -r '.data.repository.pullRequest.headRefOid' response.json)"
+            mergeable="$(jq -r '.data.repository.pullRequest.mergeable' response.json)"
+            merge_state="$(jq -r '.data.repository.pullRequest.mergeStateStatus' response.json)"
+            review="$(jq -r '.data.repository.pullRequest.reviewDecision // "NONE"' response.json)"
+            checks="$(jq -r '.data.repository.pullRequest.statusCheckRollup.state // "NONE"' response.json)"
+            decision="$(readiness_classify "$state" "$draft" "$merge_state" "$mergeable" "$checks")"
+          fi
 
-          echo "OBSERVATION state=$state draft=$draft mergeStateStatus=$merge_state mergeable=$mergeable reviewDecision=$review checks=$checks base=$base head=$head head_sha=$head_sha decision=$decision"
+          echo "OBSERVATION state=$state draft=$draft mergeStateStatus=$merge_state mergeable=$mergeable reviewDecision=$review checks=$checks base=$base head=$head head_sha=$head_sha decision=$decision protocol=$READINESS_VERSION"
 
           {
             echo "## Repository Steward Readiness Observer"
             echo
             echo "- PR: #$PR_NUMBER"
+            echo "- protocol: $READINESS_VERSION"
             echo "- state: $state"
             echo "- draft: $draft"
             echo "- base: $base"
@@ -96,7 +110,7 @@ jobs:
         shell: bash
         run: |
           case "${{ steps.query.outputs.decision }}" in
-            READY_FOR_MERGE_CANDIDATE|NOT_READY_STATE|NOT_READY_DRAFT|NOT_READY_CHECKS|NOT_READY_CONFLICT|NOT_READY_BLOCKED|NOT_READY_BEHIND|READINESS_UNKNOWN)
+            READY_FOR_MERGE_CANDIDATE|NOT_READY_STATE|NOT_READY_DRAFT|NOT_READY_CHECKS|NOT_READY_CONFLICT|NOT_READY_BLOCKED|NOT_READY_BEHIND|NOT_READY_REVIEW|READINESS_UNKNOWN)
               exit 0
               ;;
             *)

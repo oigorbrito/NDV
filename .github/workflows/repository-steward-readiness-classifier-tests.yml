@@ -3,7 +3,7 @@ name: Repository Steward Readiness Classifier Tests
 on:
   pull_request:
     paths:
-      - '.github/scripts/repository-steward-readiness-classifier.sh'
+      - '.github/scripts/repository-steward-readiness-classifier*.sh'
       - '.github/workflows/repository-steward-readiness-observer.yml'
       - '.github/workflows/repository-steward-readiness-classifier-tests.yml'
 
@@ -17,6 +17,9 @@ jobs:
       - name: Check out pull request head
         uses: actions/checkout@v4
       - name: Check shell syntax
-        run: bash -n .github/scripts/repository-steward-readiness-classifier.sh
+        run: |
+          bash -n .github/scripts/repository-steward-readiness-classifier.sh
+          bash -n .github/scripts/repository-steward-readiness-classifier-v2.sh
+          bash -n .github/scripts/repository-steward-readiness-classifier-v2-tests.sh
       - name: Run fail-closed decision matrix
-        run: bash .github/scripts/repository-steward-readiness-classifier.sh --self-test
+        run: bash .github/scripts/repository-steward-readiness-classifier-v2-tests.sh
