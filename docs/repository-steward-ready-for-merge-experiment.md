@@ -2,118 +2,133 @@
 
 ## Status
 
-PROTOCOL_DEFINED / NOT_EXECUTED
+PARTIALLY_EXECUTED / NATIVE_FIELD_ENSEMBLE_REQUIRED
 
 ## Claim
 
-A repository steward can identify pull requests that are candidates for human merge by reusing GitHub-native merge state, without reconstructing branch protection or implementing custom semantic policy.
+A repository steward can identify pull requests that are candidates for human merge by reusing GitHub-native readiness fields, without reconstructing branch protection or implementing semantic policy.
 
-## Prior art / reuse decision
+## Native fields
 
-GitHub GraphQL exposes:
+The observer reads:
 
-- `PullRequest.mergeStateStatus`;
-- `PullRequest.mergeable`;
-- `PullRequest.reviewDecision`;
-- `PullRequest.statusCheckRollup`;
-- `PullRequest.isDraft`.
+- `mergeStateStatus`;
+- `mergeable`;
+- `reviewDecision`;
+- `statusCheckRollup.state`;
+- `isDraft`;
+- base branch and head SHA.
 
-GitHub documents `mergeStateStatus` values including:
+The experiment no longer treats `mergeStateStatus` alone as authoritative. Executed evidence showed that a draft PR can still report `mergeStateStatus=CLEAN`.
 
-- `CLEAN`: mergeable and passing commit status;
-- `BLOCKED`: merge is blocked;
-- `BEHIND`: head is out of date;
-- `DIRTY`: merge commit cannot be created cleanly;
-- `DRAFT`: blocked because the PR is draft;
-- `UNSTABLE`: mergeable with non-passing commit status;
-- `UNKNOWN`: state cannot currently be determined.
+## Observer harness correction
 
-Repository rulesets currently returned by the REST API are empty. Branch-protection details are not readable through the installed integration, so the steward must not rebuild policy from incomplete repository settings.
+The original `pull_request_target` trigger caused self-interference because the observer itself became part of the PR check rollup while measuring readiness.
 
-Therefore the experiment treats GitHub's own aggregate merge state as the authoritative readiness signal.
+The harness was changed to explicit PR comment trigger:
 
-## Scope
+```text
+/readiness-observe
+```
 
-Observe/report only.
+This runs the read-only observer from `main` without making the observer itself a pending check on the PR head.
 
-For an open pull request:
+## Executed evidence
 
-1. read `mergeStateStatus`;
-2. read `mergeable`, `reviewDecision`, `statusCheckRollup.state`, `isDraft`, base branch and head SHA;
-3. emit `READY_FOR_MERGE_CANDIDATE` only when the GitHub-native merge state is `CLEAN`;
-4. otherwise emit a non-ready classification derived directly from the native state;
-5. do not merge, approve, request review, dismiss review, rerun checks or modify branch protection.
+### R1a — checks pending
 
-## Controlled cases
+Fixture: PR #45, open, non-draft.
 
-### R1 — clean open PR
+Observed while CodeQL was still running:
 
-Expected:
-- PR open;
-- not draft;
-- `mergeStateStatus=CLEAN`.
+```text
+state=OPEN
+draft=false
+mergeStateStatus=UNSTABLE
+mergeable=MERGEABLE
+reviewDecision=NONE
+checks=PENDING
+decision=NOT_READY_CHECKS
+```
 
-Decision:
-`READY_FOR_MERGE_CANDIDATE`.
+REST check-run inspection showed the pending work was real: CodeQL `Analyze (actions)` and `Analyze (python)` had not yet completed.
+
+Result: PASS for fail-closed pending-check behavior.
+
+### R1b — clean open PR
+
+Same PR #45, same head SHA, after all checks completed successfully.
+
+Observed:
+
+```text
+state=OPEN
+draft=false
+mergeStateStatus=CLEAN
+mergeable=MERGEABLE
+reviewDecision=NONE
+checks=SUCCESS
+decision=READY_FOR_MERGE_CANDIDATE
+```
+
+Run: `37409113765`
+Job: `112093307029`
+
+Result: PASS.
 
 ### R2 — draft PR
 
-Expected:
-- `mergeStateStatus=DRAFT` or explicit `isDraft=true`.
+The same PR #45 was converted to draft without changing the head SHA.
 
-Decision:
-`NOT_READY_DRAFT`.
+Observed:
 
-### R3 — non-passing checks
+```text
+state=OPEN
+draft=true
+mergeStateStatus=CLEAN
+mergeable=MERGEABLE
+reviewDecision=NONE
+checks=SUCCESS
+decision=NOT_READY_DRAFT
+```
 
-Expected:
-- `mergeStateStatus=UNSTABLE` or `statusCheckRollup.state` non-success.
+Run: `37409150158`
+Job: `112093418903`
 
-Decision:
-`NOT_READY_CHECKS`.
+Result: PASS for the wrapper, but disproves the stronger hypothesis that `mergeStateStatus` alone is sufficient.
 
-### R4 — merge conflict
+## Interim decision
 
-Expected:
-- `mergeStateStatus=DIRTY` and/or `mergeable=CONFLICTING`.
+```text
+REUSE_GITHUB_NATIVE_FIELDS = YES
+MERGE_STATE_STATUS_ALONE = REJECTED
+MINIMAL_READ_ONLY_WRAPPER = REQUIRED
+CUSTOM_SEMANTIC_ENGINE = REJECTED
+```
 
-Decision:
-`NOT_READY_CONFLICT`.
+The current safe positive rule is:
 
-### R5 — policy/review block
+```text
+state == OPEN
+AND isDraft == false
+AND mergeStateStatus == CLEAN
+AND mergeable == MERGEABLE
+AND statusCheckRollup.state == SUCCESS
+=> READY_FOR_MERGE_CANDIDATE
+```
 
-Expected:
-- `mergeStateStatus=BLOCKED`;
-- supporting evidence may include `reviewDecision=REVIEW_REQUIRED` or `CHANGES_REQUESTED`.
+This remains a report-only candidate classification. It does not authorize merge.
 
-Decision:
-`NOT_READY_BLOCKED`.
+## Remaining controlled cases
 
-### R6 — behind base
+Still not executed:
 
-Expected:
-- `mergeStateStatus=BEHIND`.
+- R4 — merge conflict;
+- R5 — policy/review block;
+- R6 — behind base;
+- R7 — unknown state.
 
-Decision:
-`NOT_READY_BEHIND`.
-
-### R7 — unknown
-
-Expected:
-- `mergeStateStatus=UNKNOWN`.
-
-Decision:
-`READINESS_UNKNOWN`.
-
-## Acceptance
-
-The experiment passes only if:
-
-- readiness classification comes from GitHub-native fields;
-- `CLEAN` is not inferred from the absence of visible failures;
-- missing branch-protection visibility does not get converted into PASS;
-- a green workflow alone is not sufficient for `READY_FOR_MERGE_CANDIDATE`;
-- no mutation is required to classify a PR.
+These cases remain NOT_PROVEN and must not be inferred from R1/R2.
 
 ## Authority
 
@@ -127,18 +142,16 @@ RERUN_CHECKS = FORBIDDEN
 CHANGE_REPOSITORY_RULES = FORBIDDEN
 ```
 
-## Decision rule
-
-If GitHub-native merge state is sufficient:
+## Current classification
 
 ```text
-DECISION = REUSE_GITHUB_MERGE_STATE
-CUSTOM_READINESS_ENGINE = REJECTED
-```
+R1 pending checks = PASS
+R1 clean          = PASS
+R2 draft          = PASS
+R4 conflict       = NOT_PROVEN
+R5 blocked        = NOT_PROVEN
+R6 behind         = NOT_PROVEN
+R7 unknown        = NOT_PROVEN
 
-If it is not sufficient:
-
-```text
-DECISION = INCONCLUSIVE
-NEXT = evaluate minimal read-only wrapper around native fields
+EXPERIMENT = PARTIALLY_EXECUTED
 ```
