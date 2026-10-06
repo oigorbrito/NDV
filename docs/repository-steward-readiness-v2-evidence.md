@@ -28,7 +28,7 @@ This report records v2 observations only. It does not rewrite v1 historical resu
 
 ## Live fixture
 
-Fixture PR #59, unchanged head `4621120d2c223896ad2502a1f7ead12d72cca0ff`, base `main`. The fixture contains one documentation file and must never be merged. The implementation used for both native observations was `45d227d81119e619a3e7e71b860614b00420bb48`.
+Fixture PR #59, unchanged head `4621120d2c223896ad2502a1f7ead12d72cca0ff`, base `main`. The fixture contains one documentation file and must never be merged. The initial UNKNOWN and settled no-review observations used implementation `45d227d81119e619a3e7e71b860614b00420bb48`. The after-review observation used `e6eec2c55433449ec5036acb56c46cc70709e209`, as identified below; the classifier and opt-in workflow were unchanged between those commits.
 
 ### Initial native UNKNOWN
 
@@ -124,3 +124,11 @@ OBSERVATION state=OPEN draft=false mergeStateStatus=BLOCKED mergeable=MERGEABLE 
 REST independently reported `mergeable_state=blocked` on the exact refs. The actual workflow ran checkout, native query and report-only assertion. This establishes native BLOCKED fail-closed handling for the observed BLOCKED+PENDING combination and its exclusion precedence. It does not establish a native BLOCKED+SUCCESS combination or a review-required policy case. A pending rollup by itself would not establish BLOCKED.
 
 Fixture #64 was closed without merge at 2026-10-06T13:14:06Z; branch retained. R5 and R6 native v2 gates are accepted within these executed scopes. V1 historical NOT_PROVEN results remain unchanged. No additional authority is granted and no repository policy is reconstructed locally.
+
+## Qualification completion boundary
+
+The five prospective gates in the frozen v2 protocol were completed before default activation: authorization/freeze; versioned implementation; exact-head synthetic matrix; same-head native candidate before review and veto afterward; inspection of checks and native logs. The additional native UNKNOWN, BEHIND+SUCCESS and BLOCKED+PENDING observations qualify only their recorded scopes.
+
+No outstanding mandatory gate in that frozen activation protocol requires repeated measurements or broader review-policy changes. APPROVED, REVIEW_REQUIRED and BLOCKED+SUCCESS retain their stated coverage limits; synthetic coverage is not promoted to native PASS. Native conflict/draft/pending results from v1 remain historical v1 evidence.
+
+This closes qualification of the NDV readiness observer within the approved READ/REPORT scope. Qualification for reuse in a different repository requires a separately identified target, its native policy/check conditions and execution evidence; NDV results alone cannot establish portability PASS. No reusable distribution or other-repository activation is claimed by this report.
