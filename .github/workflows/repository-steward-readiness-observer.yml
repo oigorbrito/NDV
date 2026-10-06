@@ -22,11 +22,15 @@ jobs:
       REPO: ${{ github.event.repository.name }}
       PR_NUMBER: ${{ github.event.issue.number }}
     steps:
+      - name: Check out the default-branch classifier
+        uses: actions/checkout@v4
+
       - name: Query GitHub-native readiness state
         id: query
         shell: bash
         run: |
           set -euo pipefail
+          source .github/scripts/repository-steward-readiness-classifier.sh
 
           query='
           query($owner:String!, $name:String!, $number:Int!) {
@@ -66,37 +70,7 @@ jobs:
           merge_state="$(jq -r '.data.repository.pullRequest.mergeStateStatus' response.json)"
           review="$(jq -r '.data.repository.pullRequest.reviewDecision // "NONE"' response.json)"
           checks="$(jq -r '.data.repository.pullRequest.statusCheckRollup.state // "NONE"' response.json)"
-
-          case "$merge_state" in
-            CLEAN)
-              decision="READY_FOR_MERGE_CANDIDATE"
-              ;;
-            DRAFT)
-              decision="NOT_READY_DRAFT"
-              ;;
-            UNSTABLE)
-              decision="NOT_READY_CHECKS"
-              ;;
-            DIRTY)
-              decision="NOT_READY_CONFLICT"
-              ;;
-            BLOCKED)
-              decision="NOT_READY_BLOCKED"
-              ;;
-            BEHIND)
-              decision="NOT_READY_BEHIND"
-              ;;
-            UNKNOWN)
-              decision="READINESS_UNKNOWN"
-              ;;
-            *)
-              decision="READINESS_UNKNOWN"
-              ;;
-          esac
-
-          if [[ "$draft" == "true" ]]; then
-            decision="NOT_READY_DRAFT"
-          fi
+          decision="$(readiness_classify "$state" "$draft" "$merge_state" "$mergeable" "$checks")"
 
           echo "OBSERVATION state=$state draft=$draft mergeStateStatus=$merge_state mergeable=$mergeable reviewDecision=$review checks=$checks base=$base head=$head head_sha=$head_sha decision=$decision"
 
@@ -122,7 +96,7 @@ jobs:
         shell: bash
         run: |
           case "${{ steps.query.outputs.decision }}" in
-            READY_FOR_MERGE_CANDIDATE|NOT_READY_DRAFT|NOT_READY_CHECKS|NOT_READY_CONFLICT|NOT_READY_BLOCKED|NOT_READY_BEHIND|READINESS_UNKNOWN)
+            READY_FOR_MERGE_CANDIDATE|NOT_READY_STATE|NOT_READY_DRAFT|NOT_READY_CHECKS|NOT_READY_CONFLICT|NOT_READY_BLOCKED|NOT_READY_BEHIND|READINESS_UNKNOWN)
               exit 0
               ;;
             *)
