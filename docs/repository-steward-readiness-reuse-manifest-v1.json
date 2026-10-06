@@ -1,0 +1,66 @@
+{
+  "schema_version": 1,
+  "capability": "repository-steward-readiness",
+  "protocol": "v2",
+  "authority": [
+    "READ",
+    "REPORT"
+  ],
+  "common_files": [
+    {
+      "path": ".github/scripts/repository-steward-readiness-classifier-v2-tests.sh",
+      "git_blob_sha": "a690e5f7ef5c62cb1c90846ff7588ba12a1fd3d1"
+    },
+    {
+      "path": ".github/scripts/repository-steward-readiness-classifier-v2.sh",
+      "git_blob_sha": "0fa164b6394fe7282f180fefb6ec6fee1938c7ce"
+    },
+    {
+      "path": ".github/scripts/repository-steward-readiness-classifier.sh",
+      "git_blob_sha": "e67cfe3da3c423f14ed677fae4be401f97fd78ad"
+    },
+    {
+      "path": ".github/scripts/repository-steward-readiness-run-association-tests.sh",
+      "git_blob_sha": "0c98538980c77710e38d28509ab3e08f8e80c43d"
+    },
+    {
+      "path": ".github/scripts/repository-steward-readiness-run-association.sh",
+      "git_blob_sha": "c542b7185c7a9848491f384701899dbeadd9333d"
+    }
+  ],
+  "profiles": [
+    {
+      "id": "ndv",
+      "repository": "oigorbrito/NDV",
+      "commit": "ed1698905f04f87c6792baf570544fe714bc059e",
+      "invocation": "workflow_run completed / pull_request or dynamic; manual fallback",
+      "workflow_files": [
+        {
+          "path": ".github/workflows/repository-steward-readiness-classifier-tests.yml",
+          "git_blob_sha": "6699bee8ea8d1b16168988934e73b1e1caf7d127"
+        },
+        {
+          "path": ".github/workflows/repository-steward-readiness-observer.yml",
+          "git_blob_sha": "e075a50143c1c61f8255e9ac87d25c459754ef23"
+        }
+      ]
+    },
+    {
+      "id": "rj",
+      "repository": "oigorbrito/RJ",
+      "commit": "5ae90995d235714d622cbc0f7b81005efc62bb92",
+      "invocation": "workflow_run completed / ci pull_request; manual fallback",
+      "workflow_files": [
+        {
+          "path": ".github/workflows/repository-steward-readiness-classifier-tests.yml",
+          "git_blob_sha": "573c1b2ef227f5364c0d1982178ff771295210e2"
+        },
+        {
+          "path": ".github/workflows/repository-steward-readiness-observer.yml",
+          "git_blob_sha": "c149f344d62c3a1b4003c5d93c31329883d23dbb"
+        }
+      ]
+    }
+  ],
+  "target_acceptance": "NOT_PROVEN until target native execution; manifest or installation is not PASS"
+}
