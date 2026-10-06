@@ -14,14 +14,14 @@ jobs:
   observe:
     if: >
       github.event.issue.pull_request != null &&
-      (github.event.comment.body == '/readiness-observe' || github.event.comment.body == '/readiness-observe-v2')
+      (github.event.comment.body == '/readiness-observe' || github.event.comment.body == '/readiness-observe-v2' || github.event.comment.body == '/readiness-observe-v1')
     runs-on: ubuntu-latest
     env:
       GH_TOKEN: ${{ github.token }}
       OWNER: ${{ github.repository_owner }}
       REPO: ${{ github.event.repository.name }}
       PR_NUMBER: ${{ github.event.issue.number }}
-      READINESS_VERSION: ${{ github.event.comment.body == '/readiness-observe-v2' && 'v2' || 'v1' }}
+      READINESS_VERSION: ${{ github.event.comment.body == '/readiness-observe-v1' && 'v1' || 'v2' }}
     steps:
       - name: Check out the default-branch classifier
         uses: actions/checkout@v4
