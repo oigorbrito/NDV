@@ -80,5 +80,21 @@ class PinnedExtractionTests(unittest.TestCase):
             self.assertEqual(record["source_row_index"], 7)
             self.assertEqual(record["full_row"]["instance_id"], "inst")
 
+    @mock.patch.object(mod, "extract_rows")
+    @mock.patch.object(mod, "sha256_file")
+    def test_missing_quarantine_tool_returns_failure(self, sha_mock, extract_mock):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp); parquet, snapshot, wave, environment = self.fixture_paths(root, "inst")
+            sha_mock.return_value = "a" * 64
+            extract_mock.return_value = [(7, {"instance_id": "inst", "base_commit": "c" * 40, "problem_statement": "fix me"})]
+            out = root / "rows.jsonl"
+            missing_tool = root / "nonexistent_quarantine.py"
+            argv = ["prog", "--parquet", str(parquet), "--snapshot", str(snapshot), "--wave", str(wave), "--environment", str(environment), "--out", str(out), "--quarantine-out", str(root / "qout"), "--quarantine-tool", str(missing_tool)]
+            with mock.patch("sys.argv", argv), mock.patch("builtins.print") as print_mock:
+                self.assertEqual(mod.main(), 2)
+                printed_json = json.loads(print_mock.call_args[0][0])
+                self.assertEqual(printed_json.get("status"), "FAIL")
+                self.assertEqual(printed_json.get("reason"), "QUARANTINE_TOOL_NOT_FOUND")
+
 
 if __name__ == "__main__": unittest.main()
