@@ -79,10 +79,19 @@ def project_executor_view(row: dict[str, Any]) -> dict[str, Any]:
     return projection
 
 
-def find_row(records: list[tuple[int, dict[str, Any]]], candidate: dict[str, Any]) -> tuple[int, dict[str, Any]]:
+def find_row(
+    records: list[tuple[int, dict[str, Any]]],
+    candidate: dict[str, Any],
+    records_by_id: dict[str, list[tuple[int, dict[str, Any]]]] | None = None,
+) -> tuple[int, dict[str, Any]]:
     wanted_id = candidate["source_instance_id"]
     declared_index = candidate.get("source_row_index")
-    matches = [(idx, row) for idx, row in records if source_instance_id(row) == wanted_id]
+    # Bolt Optimization: Use pre-indexed dictionary if provided to avoid O(M) scan per candidate.
+    # Reduces overall row lookup complexity from O(N * M) to O(N + M).
+    if records_by_id is not None:
+        matches = records_by_id.get(wanted_id, [])
+    else:
+        matches = [(idx, row) for idx, row in records if source_instance_id(row) == wanted_id]
     if len(matches) != 1:
         raise ValueError(f"{wanted_id}: expected exactly one matching source row, found {len(matches)}")
     idx, row = matches[0]
@@ -156,9 +165,18 @@ def main() -> int:
 
     wave = json.loads(args.wave.read_text(encoding="utf-8"))
     records = load_records(args.rows)
+
+    # Bolt Optimization: Pre-index records by source_instance_id in O(M) time to prevent
+    # O(N * M) linear list scanning when looking up each candidate's row in large dataset exports.
+    records_by_id: dict[str, list[tuple[int, dict[str, Any]]]] = {}
+    for idx, row in records:
+        sid = source_instance_id(row)
+        if sid:
+            records_by_id.setdefault(sid, []).append((idx, row))
+
     manifests = []
     for candidate in wave["candidates"]:
-        row_index, row = find_row(records, candidate)
+        row_index, row = find_row(records, candidate, records_by_id=records_by_id)
         manifests.append(quarantine_one(row, row_index, candidate, wave, args.out, str(args.rows)))
 
     aggregate = {
