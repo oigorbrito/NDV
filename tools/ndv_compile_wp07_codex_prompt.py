@@ -90,6 +90,9 @@ def compile_prompt(run_spec_path: Path, artifact_root: Path) -> dict[str, Any]:
     statement = projection.get("problem_statement")
     if not isinstance(statement, str) or not statement.strip():
         raise ValueError("non-empty problem_statement required")
+    # Security enhancement: enforce input length limit to mitigate DoS / resource exhaustion risks
+    if len(statement) > 50000:
+        raise ValueError("problem_statement exceeds maximum permitted length limit (50000 characters)")
     statement_sha = hashlib.sha256(statement.encode("utf-8")).hexdigest()
     if statement_sha != source.get("task_statement_sha256") or statement_sha != task_spec.get("task_statement_sha256"):
         raise ValueError("task statement SHA-256 mismatch")
