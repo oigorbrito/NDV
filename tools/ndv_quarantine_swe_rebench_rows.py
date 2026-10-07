@@ -79,10 +79,29 @@ def project_executor_view(row: dict[str, Any]) -> dict[str, Any]:
     return projection
 
 
-def find_row(records: list[tuple[int, dict[str, Any]]], candidate: dict[str, Any]) -> tuple[int, dict[str, Any]]:
+def build_records_index(records: list[tuple[int, dict[str, Any]]]) -> dict[str, list[tuple[int, dict[str, Any]]]]:
+    # Performance optimization: Pre-index records by source instance ID to turn O(N) linear scans
+    # per candidate lookup into O(1) hash map lookups.
+    index: dict[str, list[tuple[int, dict[str, Any]]]] = {}
+    for idx, row in records:
+        sid = source_instance_id(row)
+        if sid:
+            index.setdefault(sid, []).append((idx, row))
+    return index
+
+
+def find_row(
+    records: list[tuple[int, dict[str, Any]]],
+    candidate: dict[str, Any],
+    records_index: dict[str, list[tuple[int, dict[str, Any]]]] | None = None,
+) -> tuple[int, dict[str, Any]]:
     wanted_id = candidate["source_instance_id"]
     declared_index = candidate.get("source_row_index")
-    matches = [(idx, row) for idx, row in records if source_instance_id(row) == wanted_id]
+    # Performance optimization: Use O(1) pre-indexed map lookup if available, otherwise fall back to linear scan.
+    if records_index is not None:
+        matches = records_index.get(wanted_id, [])
+    else:
+        matches = [(idx, row) for idx, row in records if source_instance_id(row) == wanted_id]
     if len(matches) != 1:
         raise ValueError(f"{wanted_id}: expected exactly one matching source row, found {len(matches)}")
     idx, row = matches[0]
@@ -156,9 +175,11 @@ def main() -> int:
 
     wave = json.loads(args.wave.read_text(encoding="utf-8"))
     records = load_records(args.rows)
+    # Performance optimization: Build index once to reduce total matching time complexity from O(N * M) to O(N + M).
+    records_index = build_records_index(records)
     manifests = []
     for candidate in wave["candidates"]:
-        row_index, row = find_row(records, candidate)
+        row_index, row = find_row(records, candidate, records_index=records_index)
         manifests.append(quarantine_one(row, row_index, candidate, wave, args.out, str(args.rows)))
 
     aggregate = {

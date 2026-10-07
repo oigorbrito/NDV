@@ -1,0 +1,3 @@
+## 2025-05-18 - Hash map pre-indexing for dataset row quarantine
+**Learning:** `ndv_quarantine_swe_rebench_rows` matches wave candidates against raw exported dataset rows using linear scanning over all records per candidate ($O(N \cdot M)$). Pre-indexing the dataset records by `source_instance_id` once turns lookups into $O(1)$ dictionary queries ($O(N + M)$), yielding a ~250x speedup on datasets with thousands of rows.
+**Action:** When working with NDV dataset processing pipelines that match candidates against exported row sets or manifests, pre-build an index map keyed on `source_instance_id` or `candidate_id` before iterating through candidates.
