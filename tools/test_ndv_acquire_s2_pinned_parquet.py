@@ -42,6 +42,12 @@ class AcquisitionTests(unittest.TestCase):
         snapshot = self.snapshot(); snapshot["parquet_path"] = "../secret"
         with self.assertRaises(ValueError): mod.build_url(snapshot, self.contract())
 
+    def test_disallowed_url_scheme_rejected(self):
+        contract = self.contract()
+        contract["remote_url_template"] = "file:///{dataset}/{revision}/{parquet_path}"
+        with self.assertRaisesRegex(ValueError, "disallowed URL scheme"):
+            mod.build_url(self.snapshot(), contract)
+
     def test_verify_file_checks_size_and_hash(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "x"; path.write_bytes(b"fixture"); snap = self.snapshot()

@@ -13,6 +13,7 @@ import hashlib
 import json
 import os
 import re
+import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
@@ -61,7 +62,11 @@ def build_url(snapshot: dict[str, Any], contract: dict[str, Any]) -> str:
         raise ValueError("snapshot parquet_path must be a safe relative path")
     if not isinstance(template, str) or any(x not in template for x in ("{dataset}", "{revision}", "{parquet_path}")):
         raise ValueError("acquisition contract remote_url_template invalid")
-    return template.format(dataset=dataset, revision=revision, parquet_path=parquet_path)
+    url = template.format(dataset=dataset, revision=revision, parquet_path=parquet_path)
+    parsed = urllib.parse.urlparse(url)
+    if parsed.scheme not in ("http", "https"):
+        raise ValueError(f"disallowed URL scheme: {parsed.scheme!r}; must be http or https")
+    return url
 
 
 def expected_integrity(snapshot: dict[str, Any]) -> tuple[int, str]:
