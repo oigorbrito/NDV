@@ -108,6 +108,15 @@ class WorkspaceMaterializerTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError,"image digest mismatch"):
                 mod.validate_inputs(sp,root)
 
+    def test_resolve_path_traversal_blocked(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp)/"sub"
+            root.mkdir()
+            outside=Path(tmp)/"outside.txt"
+            outside.write_text("secret", encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "path traversal rejected"):
+                mod.resolve(root, "../outside.txt", "ref")
+
 
 if __name__=="__main__":
     unittest.main()

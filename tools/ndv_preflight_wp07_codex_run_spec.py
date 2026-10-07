@@ -18,6 +18,7 @@ def load(path:Path)->Any:return json.loads(path.read_text(encoding="utf-8"))
 def resolve(root:Path,value:Any,label:str)->Path:
  if not isinstance(value,str) or not value:raise ValueError(f"{label} missing")
  p=Path(value);p=p if p.is_absolute() else root/p;p=p.resolve()
+ if not p.is_relative_to(root.resolve()):raise ValueError(f"{label} path traversal rejected: {p}")
  if not p.is_file():raise ValueError(f"{label} not found: {p}")
  return p
 def version_tuple(raw:str)->tuple[int,int,int]:
