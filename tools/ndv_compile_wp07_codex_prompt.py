@@ -30,10 +30,13 @@ def sha_file(path: Path) -> str:
 def resolve(root: Path, value: Any, label: str) -> Path:
     if not isinstance(value, str) or not value:
         raise ValueError(f"{label} missing")
+    root_resolved = root.resolve()
     p = Path(value)
-    if not p.is_absolute():
-        p = root / p
+    p = p if p.is_absolute() else root_resolved / p
     p = p.resolve()
+    # Security: Ensure resolved path stays within artifact_root to prevent path traversal
+    if not p.is_relative_to(root_resolved):
+        raise ValueError(f"{label} path traversal outside root: {value}")
     if not p.is_file():
         raise ValueError(f"{label} not found: {p}")
     return p

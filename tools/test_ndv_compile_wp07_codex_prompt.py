@@ -137,6 +137,15 @@ class CodexPromptCompilerTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "record_sha256 mismatch"):
                 mod.compile_prompt(sp, r)
 
+    def test_resolve_path_traversal_blocks(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "sub"
+            root.mkdir()
+            with self.assertRaisesRegex(ValueError, "path traversal outside root"):
+                mod.resolve(root, "../outside.json", "test_ref")
+            with self.assertRaisesRegex(ValueError, "path traversal outside root"):
+                mod.resolve(root, "/etc/passwd", "test_ref")
+
 
 if __name__ == "__main__":
     unittest.main()
