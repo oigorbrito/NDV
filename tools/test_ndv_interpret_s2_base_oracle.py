@@ -1,5 +1,6 @@
 import importlib.util
 import unittest
+from unittest import mock
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -47,6 +48,18 @@ class OracleInterpreterTests(unittest.TestCase):
     def test_no_fail_to_pass_is_not_silently_accepted(self):
         row = dict(self.row); row["FAIL_TO_PASS"] = []
         self.assertEqual(mod.interpret(row, self.run, "ignored", self.parser)["classification"], "ORACLE_MISMATCH")
+
+    @mock.patch.object(mod.importlib, "import_module")
+    def test_import_parser_rejects_invalid_and_uncallable_names(self, mock_import):
+        class FakeModule:
+            __doc__ = "module doc"
+            NAME_TO_PARSER = {}
+
+        mock_import.return_value = FakeModule()
+        root = HERE.parent
+        for invalid_name in ["", "_private", "__doc__", "__file__", "nonexistent_parser_123"]:
+            with self.assertRaises(RuntimeError):
+                mod.import_parser(root, invalid_name)
 
 
 if __name__ == "__main__":

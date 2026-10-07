@@ -79,6 +79,9 @@ def verify_upstream(root: Path) -> dict[str, str]:
 
 
 def import_parser(root: Path, parser_name: str):
+    # Security: Validate parser_name input and prevent access to private/dunder module attributes
+    if not isinstance(parser_name, str) or not parser_name or parser_name.startswith("_"):
+        raise RuntimeError(f"invalid parser name: {parser_name!r}")
     root_s, lib_s = str(root), str(root / "lib")
     if root_s not in sys.path:
         sys.path.insert(0, root_s)
@@ -86,8 +89,9 @@ def import_parser(root: Path, parser_name: str):
         sys.path.insert(0, lib_s)
     mod = importlib.import_module("agent.log_parsers")
     parser = getattr(mod, "NAME_TO_PARSER", {}).get(parser_name) or getattr(mod, parser_name, None)
-    if parser is None:
-        raise RuntimeError(f"unknown frozen parser: {parser_name}")
+    # Security: Ensure resolved parser attribute is callable to avoid executing non-callable objects
+    if parser is None or not callable(parser):
+        raise RuntimeError(f"unknown or uncallable frozen parser: {parser_name}")
     return parser
 
 
