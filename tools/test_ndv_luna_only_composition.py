@@ -4,9 +4,11 @@ import ndv_compile_luna_composition_prompt as c
 import ndv_validate_luna_only_composition_contracts as v
 import ndv_qualify_luna_composition_planner as pq
 
+ROOT = Path(__file__).parents[1]
+
 class LunaCompositionTests(unittest.TestCase):
     def test_contracts_validate(self):
-        out=v.validate(Path("../experiments/luna-only/luna-composition-protocol-v1.json"),Path("../experiments/luna-only/luna-decomposition-plan-schema-v1.json"),Path("../experiments/luna-only/luna-composition-prompts-v1.json"))
+        out=v.validate(ROOT / "experiments/luna-only/luna-composition-protocol-v1.json", ROOT / "experiments/luna-only/luna-decomposition-plan-schema-v1.json", ROOT / "experiments/luna-only/luna-composition-prompts-v1.json")
         self.assertEqual(out["status"],"LUNA_ONLY_COMPOSITION_CONTRACTS_VALID")
     def plan(self):
         return {"schema_id":"ndv-luna-decomposition-plan-v1","task_id":"T1","objective":"Do task","constraints":["preserve behavior"],"steps":[
@@ -14,7 +16,7 @@ class LunaCompositionTests(unittest.TestCase):
             {"id":"S2","objective":"Integrate","dependencies":["S1"],"expected_artifact":"integrated candidate","verification":"run focused check"}],
             "final_verification":"run frozen verifier"}
     def prompts(self):
-        return json.loads(Path("../experiments/luna-only/luna-composition-prompts-v1.json").read_text())
+        return json.loads((ROOT / "experiments/luna-only/luna-composition-prompts-v1.json").read_text())
     def test_plan_and_modes_compile(self):
         p=self.plan(); c.validate_plan(p,"T1")
         for mode in ("D0","PLANNER","D1"):
