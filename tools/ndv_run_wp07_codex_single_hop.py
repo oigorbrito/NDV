@@ -80,6 +80,8 @@ def verify_workspace_manifest(manifest_path: Path, run_spec_path: Path) -> dict[
 
 
 def capture_candidate_diff(workspace: Path, base_sha: str) -> tuple[str, bytes]:
+    if not isinstance(base_sha, str) or not base_sha or base_sha.startswith("-"):
+        raise ValueError(f"invalid base_sha for candidate diff: {base_sha!r}")
     status = git(workspace, ["status", "--porcelain=v1"])
     if status.returncode != 0:
         raise ValueError("git status failed after executor")
