@@ -72,7 +72,7 @@ def verifier_timeout_seconds(spec:dict[str,Any],artifact_root:Path)->float:
  return min(reserve,remaining)/1000.0
 def build_script(base_sha:str,commands:list[str])->str:
  lines=["set +e","observed_head=$(git rev-parse HEAD 2>/dev/null)",'printf "__NDV_HEAD__=%s\\n" "$observed_head"',f"if [ \"$observed_head\" != {shlex.quote(base_sha)} ]; then exit 90; fi",'if [ -z "$(git status --porcelain=v1)" ]; then echo __NDV_CLEAN__=YES; else echo __NDV_CLEAN__=NO; exit 91; fi',"apply_rc=0","if [ -s /tmp/ndv-candidate.diff ]; then git apply --check /tmp/ndv-candidate.diff; apply_rc=$?; if [ \"$apply_rc\" -eq 0 ]; then git apply --whitespace=nowarn /tmp/ndv-candidate.diff; apply_rc=$?; fi; fi",'printf "__NDV_APPLY_RC__=%s\\n" "$apply_rc"','if [ "$apply_rc" -ne 0 ]; then exit 92; fi',"overall=0"]
- for idx,command in enumerate(commands,1):lines += [f"eval {shlex.quote(command)}","rc=$?",f'printf "__NDV_CMD_{idx}_RC__=%s\\n" "$rc"','if [ "$rc" -ne 0 ]; then overall=1; fi']
+ for idx,command in enumerate(commands,1):lines += [f"{command}","rc=$?",f'printf "__NDV_CMD_{idx}_RC__=%s\\n" "$rc"','if [ "$rc" -ne 0 ]; then overall=1; fi']
  lines.append('exit "$overall"');return "\n".join(lines)
 def parse_markers(stdout:str,count:int)->dict[str,Any]:
  import re
